@@ -27,11 +27,7 @@ struct PanelSettingsView: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(TerminalColors.dimmedText)
 
-            SettingsRowView(
-                icon: "display",
-                title: "Screen",
-                trailing: AnyView(dropdownIndicator("Auto"))
-            )
+            ScreenPickerRow(screenSelector: ScreenSelector.shared)
 
             SoundPickerView()
         }
@@ -102,17 +98,6 @@ struct PanelSettingsView: View {
         }
         .buttonStyle(.plain)
         .padding(.bottom, 8)
-    }
-
-    private func dropdownIndicator(_ text: String) -> some View {
-        HStack(spacing: 4) {
-            Text(text)
-                .font(.system(size: 11))
-                .foregroundColor(TerminalColors.secondaryText)
-            Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 9))
-                .foregroundColor(TerminalColors.dimmedText)
-        }
     }
 
     private func toggleIndicator(_ isOn: Bool) -> some View {

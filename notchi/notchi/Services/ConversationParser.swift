@@ -134,8 +134,6 @@ actor ConversationParser {
         lastFileOffset[sessionId] = fileSize
         seenMessageIds[sessionId] = seen
 
-        logger.debug("Parsed \(messages.count) new assistant messages from \(sessionFile)")
-
         return messages
     }
 

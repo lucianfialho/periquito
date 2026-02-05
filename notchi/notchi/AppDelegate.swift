@@ -3,6 +3,7 @@ import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var notchPanel: NotchPanel?
+    private let windowHeight: CGFloat = 500
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
@@ -27,19 +28,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupNotchWindow() {
-        let screen = NSScreen.builtInOrMain
+        ScreenSelector.shared.refreshScreens()
+        guard let screen = ScreenSelector.shared.selectedScreen else { return }
         NotchPanelManager.shared.updateGeometry(for: screen)
 
-        let screenFrame = screen.frame
-        let windowHeight: CGFloat = 500
-        let frame = NSRect(
-            x: screenFrame.origin.x,
-            y: screenFrame.maxY - windowHeight,
-            width: screenFrame.width,
-            height: windowHeight
-        )
-
-        let panel = NotchPanel(frame: frame)
+        let panel = NotchPanel(frame: windowFrame(for: screen))
         NotchPanelManager.shared.panel = panel
 
         let contentView = NotchContentView()
@@ -61,20 +54,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func repositionWindow() {
         guard let panel = notchPanel else { return }
-        let screen = NSScreen.builtInOrMain
+        ScreenSelector.shared.refreshScreens()
+        guard let screen = ScreenSelector.shared.selectedScreen else { return }
 
-        // Recalculate notch geometry for new screen config
         NotchPanelManager.shared.updateGeometry(for: screen)
+        panel.setFrame(windowFrame(for: screen), display: true)
+    }
 
+    private func windowFrame(for screen: NSScreen) -> NSRect {
         let screenFrame = screen.frame
-        let windowHeight: CGFloat = 500
-        let frame = NSRect(
+        return NSRect(
             x: screenFrame.origin.x,
             y: screenFrame.maxY - windowHeight,
             width: screenFrame.width,
             height: windowHeight
         )
-        panel.setFrame(frame, display: true)
     }
 
     private func startUsageService() {
