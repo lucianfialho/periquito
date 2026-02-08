@@ -151,63 +151,66 @@ struct ExpandedPanelView: View {
     private var activitySection: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !isActivityCollapsed {
-                HStack {
-                    if let session = effectiveSession {
-                        Text("Notchi #\(session.sessionNumber)")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(TerminalColors.secondaryText)
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack {
+                        if let session = effectiveSession {
+                            Text("Notchi #\(session.sessionNumber)")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(TerminalColors.secondaryText)
+                        }
+
+                        Spacer()
+
+                        if let mode = effectiveSession?.currentModeDisplay {
+                            ModeBadgeView(mode: mode)
+                        }
                     }
+                    .padding(.top, 6)
+                    .padding(.bottom, 10)
 
-                    Spacer()
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 0) {
+                                if let prompt = effectiveSession?.lastUserPrompt {
+                                    UserPromptBubbleView(text: prompt)
+                                        .frame(maxWidth: .infinity, alignment: .trailing)
+                                        .padding(.bottom, 8)
+                                }
 
-                    if let mode = effectiveSession?.currentModeDisplay {
-                        ModeBadgeView(mode: mode)
-                    }
-                }
-                .padding(.top, 6)
-                .padding(.bottom, 10)
-
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            if let prompt = effectiveSession?.lastUserPrompt {
-                                UserPromptBubbleView(text: prompt)
-                                    .frame(maxWidth: .infinity, alignment: .trailing)
-                                    .padding(.bottom, 8)
+                                ForEach(unifiedActivityItems) { item in
+                                    switch item {
+                                    case .tool(let event):
+                                        ActivityRowView(event: event)
+                                            .id(item.id)
+                                    case .assistant(let message):
+                                        AssistantTextRowView(message: message)
+                                            .id(item.id)
+                                    }
+                                }
                             }
-
-                            ForEach(unifiedActivityItems) { item in
-                                switch item {
-                                case .tool(let event):
-                                    ActivityRowView(event: event)
-                                        .id(item.id)
-                                case .assistant(let message):
-                                    AssistantTextRowView(message: message)
-                                        .id(item.id)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .frame(maxHeight: 200)
+                        .onAppear {
+                            if let lastItem = unifiedActivityItems.last {
+                                proxy.scrollTo(lastItem.id, anchor: .bottom)
+                            }
+                        }
+                        .onChange(of: unifiedActivityItems.last?.id) { _, newId in
+                            if let id = newId {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    proxy.scrollTo(id, anchor: .bottom)
                                 }
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxHeight: 200)
-                    .onAppear {
-                        if let lastItem = unifiedActivityItems.last {
-                            proxy.scrollTo(lastItem.id, anchor: .bottom)
-                        }
-                    }
-                    .onChange(of: unifiedActivityItems.last?.id) { _, newId in
-                        if let id = newId {
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                proxy.scrollTo(id, anchor: .bottom)
-                            }
-                        }
-                    }
-                }
 
-                if showIndicator {
-                    WorkingIndicatorView(state: state)
-                        .padding(.top, 4)
+                    if showIndicator {
+                        WorkingIndicatorView(state: state)
+                            .padding(.top, 4)
+                    }
                 }
+                .transition(.opacity)
             }
         }
     }

@@ -83,7 +83,11 @@ struct NotchContentView: View {
         }
         .overlay(alignment: .topTrailing) {
             if isExpanded && !showingPanelSettings {
-                Button(action: { isActivityCollapsed.toggle() }) {
+                Button(action: {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        isActivityCollapsed.toggle()
+                    }
+                }) {
                     Image(systemName: isActivityCollapsed ? "chevron.down" : "chevron.up")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
