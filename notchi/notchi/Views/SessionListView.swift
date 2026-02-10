@@ -11,7 +11,7 @@ struct SessionListView: View {
             Text("Active Sessions")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(TerminalColors.secondaryText)
-                .padding(.top, 12)
+                .padding(.top, 8)
                 .padding(.bottom, 8)
 
             ScrollView {

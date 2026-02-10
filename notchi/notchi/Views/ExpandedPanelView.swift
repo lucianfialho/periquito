@@ -175,7 +175,7 @@ struct ExpandedPanelView: View {
                             ModeBadgeView(mode: mode)
                         }
                     }
-                    .padding(.top, 6)
+                    .padding(.top, 8)
                     .padding(.bottom, 10)
 
                     ScrollViewReader { proxy in
@@ -207,6 +207,13 @@ struct ExpandedPanelView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .frame(maxHeight: 200)
+                        .mask(
+                            VStack(spacing: 0) {
+                                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                                    .frame(height: 8)
+                                Color.black
+                            }
+                        )
                         .onAppear {
                             if let lastItem = unifiedActivityItems.last {
                                 proxy.scrollTo(lastItem.id, anchor: .bottom)
