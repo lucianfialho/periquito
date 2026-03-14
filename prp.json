@@ -1,0 +1,112 @@
+{
+  "name": "Stats Tab in Expanded Panel",
+  "vision": "Add an in-app stats view (accuracy %, prompt counts) to the Periquito notch panel, reading from ~/.english-learning/history.jsonl, with a tab bar to switch between Tips and Stats.",
+  "features": [
+    {
+      "name": "History Parser Service",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "Create HistoryStats model and JSONL parser",
+          "description": "Create a new file `periquito-app/periquito/Services/HistoryStatsLoader.swift`. Define a `HistoryStats` struct with fields: `totalGood: Int`, `totalCorrections: Int`, `accuracy: Int` (0-100, computed as good/(good+corrections)*100, 0 if no data). Add a static async function `load() -> HistoryStats` that reads `~/.english-learning/history.jsonl`, parses each line as JSON, counts entries where type == \"good\" and type == \"correction\" (skip entries with type == \"skip\"), and returns the computed stats. Use the same `historyDir` path pattern as EmotionAnalyzer. If the file doesn't exist or is empty, return zeroed stats. Run parsing on a background thread with `Task.detached` and deliver results as a Sendable struct.",
+          "priority": 1,
+          "passes": false,
+          "tests": {
+            "command": "xcodebuild -project periquito-app/periquito.xcodeproj -scheme periquito -configuration Debug build 2>&1 | tail -5"
+          },
+          "acceptance": [
+            "HistoryStatsLoader.swift exists in Services/",
+            "HistoryStats struct has totalGood, totalCorrections, accuracy fields",
+            "load() is async and reads from ~/.english-learning/history.jsonl",
+            "Skipped entries (type == 'skip') are excluded from counts",
+            "Returns zeroed stats if file missing or empty — no crashes",
+            "Build succeeds with no errors"
+          ],
+          "context": {
+            "files": [
+              "periquito-app/periquito/Services/EmotionAnalyzer.swift"
+            ],
+            "hints": [
+              "Follow EmotionAnalyzer's pattern for historyDir/historyFile paths",
+              "HistoryStats should be a simple struct, not Observable",
+              "Use JSONSerialization to parse each line (same format EmotionAnalyzer writes)"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stats View UI",
+      "tasks": [
+        {
+          "id": "2",
+          "title": "Create StatsView with accuracy and counts display",
+          "description": "Create `periquito-app/periquito/Views/StatsView.swift`. Build a SwiftUI view that receives `HistoryStats` and displays: (1) A large accuracy percentage number with '%' suffix, color-coded using TerminalColors (green >= 80, amber 50-79, red < 50), showing '—' if no data. (2) Below that, a row with three stat cards: 'Evaluated' (totalGood + totalCorrections), 'Good' (green, totalGood count), 'Corrections' (amber, totalCorrections count). Use TerminalColors for all styling. Match the existing panel aesthetic (dark background, light text, system fonts). Max width constraint of 402pt. Add an empty state: if totalGood + totalCorrections == 0, show 'Start writing in English to see your progress!' using TerminalColors.secondaryText and dimmedText, matching the existing emptyState pattern in ExpandedPanelView.",
+          "priority": 2,
+          "passes": false,
+          "tests": {
+            "command": "xcodebuild -project periquito-app/periquito.xcodeproj -scheme periquito -configuration Debug build 2>&1 | tail -5"
+          },
+          "acceptance": [
+            "StatsView.swift exists in Views/",
+            "Accuracy displayed as large number with color coding (green/amber/red)",
+            "Shows '—' when no data instead of '0%'",
+            "Three stat cards: Evaluated, Good (green), Corrections (amber)",
+            "Empty state message shown when totalGood + totalCorrections == 0",
+            "Uses TerminalColors consistently — no hardcoded colors",
+            "Build succeeds with no errors"
+          ],
+          "context": {
+            "files": [
+              "periquito-app/periquito/UI/TerminalColors.swift",
+              "periquito-app/periquito/Views/ExpandedPanelView.swift"
+            ],
+            "hints": [
+              "Use AppSettings.fontSize for consistent font sizing",
+              "TerminalColors: green, amber, red, primaryText, secondaryText, dimmedText, subtleBackground",
+              "Look at the emptyState var in ExpandedPanelView for styling reference"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tab Bar Navigation",
+      "tasks": [
+        {
+          "id": "3",
+          "title": "Add tab bar to ExpandedPanelView and integrate StatsView",
+          "description": "Modify `periquito-app/periquito/Views/ExpandedPanelView.swift`. Add a `@State private var selectedTab: PanelTab = .tips` enum (cases: .tips, .stats). In the `activityContent` function, insert a tab bar below the divider (before tipsSection). The tab bar has two buttons: 'Tips' and 'Stats', styled as underlined text when selected, dimmed when not. Below the tab bar, conditionally show either the existing tipsSection (when .tips) or StatsView (when .stats). For StatsView, add a `@State private var historyStats: HistoryStats?` property. Load stats via `HistoryStatsLoader.load()` in `.task {}` on the StatsView container, and reload when `tips.count` changes using `.onChange(of: tips.count)`. Pass the loaded stats to StatsView. The tab bar should animate transitions with `.easeInOut(duration: 0.2)`.",
+          "priority": 3,
+          "passes": false,
+          "tests": {
+            "command": "xcodebuild -project periquito-app/periquito.xcodeproj -scheme periquito -configuration Debug build 2>&1 | tail -5"
+          },
+          "acceptance": [
+            "PanelTab enum defined with .tips and .stats cases",
+            "Tab bar visible with 'Tips' and 'Stats' buttons",
+            "Tips tab selected by default",
+            "Switching tabs shows correct content with animation",
+            "Stats reload when tips.count changes (real-time update)",
+            "Stats load on first appear via .task {}",
+            "Tab bar uses TerminalColors styling",
+            "Build succeeds with no errors"
+          ],
+          "context": {
+            "files": [
+              "periquito-app/periquito/Views/ExpandedPanelView.swift",
+              "periquito-app/periquito/Views/StatsView.swift",
+              "periquito-app/periquito/Services/HistoryStatsLoader.swift"
+            ],
+            "hints": [
+              "Add PanelTab enum inside ExpandedPanelView or at file level",
+              "Tab bar goes between the Divider and the ScrollViewReader in activityContent",
+              "Keep the working indicator (WorkingIndicatorView) visible regardless of tab",
+              "Use .opacity() or conditional to preserve tips scroll position when switching to stats"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

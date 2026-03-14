@@ -1,10 +1,17 @@
 import SwiftUI
 
+private enum PanelTab: String, CaseIterable {
+    case tips = "Tips"
+    case stats = "Stats"
+}
+
 struct ExpandedPanelView: View {
     let sessionStore: SessionStore
     @Binding var showingSettings: Bool
     @Binding var showingSessionActivity: Bool
     @Binding var isActivityCollapsed: Bool
+    @State private var selectedTab: PanelTab = .tips
+    @State private var historyStats: HistoryStats?
 
     private var effectiveSession: SessionData? {
         sessionStore.effectiveSession
@@ -99,12 +106,22 @@ struct ExpandedPanelView: View {
             }
 
             VStack(alignment: .leading, spacing: 0) {
-                if !tips.isEmpty {
+                if !isActivityCollapsed {
                     Divider().background(Color.white.opacity(0.08))
-                    tipsSection
-                } else if !isActivityCollapsed {
-                    Spacer()
-                    emptyState
+                    tabBar
+                }
+
+                if selectedTab == .tips {
+                    if !tips.isEmpty {
+                        tipsSection
+                    } else if !isActivityCollapsed {
+                        Spacer()
+                        emptyState
+                    }
+                } else {
+                    if !isActivityCollapsed {
+                        StatsView(stats: historyStats)
+                    }
                 }
 
                 if !isActivityCollapsed {
@@ -116,6 +133,10 @@ struct ExpandedPanelView: View {
                 }
             }
             .padding(.horizontal, 12)
+            .task { await loadStats() }
+            .onChange(of: tips.count) { _, _ in
+                Task { await loadStats() }
+            }
         }
         .padding(.bottom, 5)
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -127,6 +148,37 @@ struct ExpandedPanelView: View {
 
     private var currentEmotion: PeriquitoEmotion {
         effectiveSession?.state.emotion ?? .neutral
+    }
+
+    private var tabBar: some View {
+        HStack(spacing: 0) {
+            ForEach(PanelTab.allCases, id: \.self) { tab in
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedTab = tab
+                    }
+                }) {
+                    VStack(spacing: 4) {
+                        Text(tab.rawValue)
+                            .font(.system(size: 11, weight: selectedTab == tab ? .semibold : .regular))
+                            .foregroundColor(selectedTab == tab ? TerminalColors.primaryText : TerminalColors.dimmedText)
+
+                        Rectangle()
+                            .fill(selectedTab == tab ? TerminalColors.green : Color.clear)
+                            .frame(height: 1.5)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.bottom, 4)
+    }
+
+    private func loadStats() async {
+        historyStats = await HistoryStatsLoader.load()
     }
 
     private var tipsSection: some View {
