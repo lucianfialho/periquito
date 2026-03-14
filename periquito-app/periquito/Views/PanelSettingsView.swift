@@ -6,7 +6,6 @@ struct PanelSettingsView: View {
     @State private var hooksInstalled = HookInstaller.isInstalled()
     @State private var hooksError = false
     @ObservedObject private var updateManager = UpdateManager.shared
-    private var usageConnected: Bool { ClaudeUsageService.shared.isConnected }
     @State private var claudeAvailable = false
 
     private var hookStatusText: String {
@@ -62,16 +61,6 @@ struct PanelSettingsView: View {
             Button(action: installHooksIfNeeded) {
                 SettingsRowView(icon: "terminal", title: "Hooks") {
                     statusBadge(hookStatusText, color: hookStatusColor)
-                }
-            }
-            .buttonStyle(.plain)
-
-            Button(action: connectUsage) {
-                SettingsRowView(icon: "gauge.with.dots.needle.33percent", title: "Claude Usage") {
-                    statusBadge(
-                        usageConnected ? "Connected" : "Not Connected",
-                        color: usageConnected ? TerminalColors.green : TerminalColors.red
-                    )
                 }
             }
             .buttonStyle(.plain)

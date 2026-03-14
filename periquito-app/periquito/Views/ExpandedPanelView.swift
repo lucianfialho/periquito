@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ExpandedPanelView: View {
     let sessionStore: SessionStore
-    let usageService: ClaudeUsageService
     @Binding var showingSettings: Bool
     @Binding var showingSessionActivity: Bool
     @Binding var isActivityCollapsed: Bool
@@ -80,14 +79,6 @@ struct ExpandedPanelView: View {
                 }
 
                 Spacer()
-
-                UsageBarView(
-                    usage: usageService.currentUsage,
-                    isLoading: usageService.isLoading,
-                    error: usageService.error,
-                    onConnect: { ClaudeUsageService.shared.connectAndStartPolling() },
-                    onRetry: { ClaudeUsageService.shared.retryNow() }
-                )
             }
             .padding(.horizontal, 12)
         }
@@ -123,15 +114,6 @@ struct ExpandedPanelView: View {
                 if showIndicator && !isActivityCollapsed {
                     WorkingIndicatorView(state: state)
                 }
-
-                UsageBarView(
-                    usage: usageService.currentUsage,
-                    isLoading: usageService.isLoading,
-                    error: usageService.error,
-                    compact: isActivityCollapsed,
-                    onConnect: { ClaudeUsageService.shared.connectAndStartPolling() },
-                    onRetry: { ClaudeUsageService.shared.retryNow() }
-                )
             }
             .padding(.horizontal, 12)
         }

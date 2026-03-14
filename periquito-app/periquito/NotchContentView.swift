@@ -148,7 +148,6 @@ struct NotchContentView: View {
                 if isExpanded {
                     ExpandedPanelView(
                         sessionStore: sessionStore,
-                        usageService: usageService,
                         showingSettings: $showingPanelSettings,
                         showingSessionActivity: $showingSessionActivity,
                         isActivityCollapsed: $isActivityCollapsed
