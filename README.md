@@ -8,10 +8,16 @@ https://github.com/user-attachments/assets/e417bd40-cae8-47c0-998a-905166cf3513
 
 - Reacts to Claude Code events in real-time (thinking, working, errors, completions)
 - Analyzes conversation sentiment to show emotions (happy, sad, neutral, sob)
-- Click to expand and see session usage
+- Click to expand and see session time and usage quota
 - Supports multiple concurrent Claude Code sessions with individual sprites
 - Sound effects for events (optional, auto-muted when terminal is focused)
 - Auto-updates via Sparkle
+
+## Requirements
+
+- macOS 15.0+ (Sequoia)
+- MacBook with notch
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
 
 ## Install
 
@@ -28,12 +34,6 @@ https://github.com/user-attachments/assets/e417bd40-cae8-47c0-998a-905166cf3513
 
 6. Start using Claude Code and watch Notchi react
 
-## Requirements
-
-- macOS 15.0+ (Sequoia)
-- MacBook with notch
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
-
 ## How it works
 
 ```
@@ -44,10 +44,15 @@ Notchi registers shell script hooks with Claude Code on launch. When Claude Code
 
 Each Claude Code session gets its own sprite on the grass island. Clicking expands the notch panel to show a live activity feed, session info, and API usage stats.
 
+## Contributing
+
+If you have any bugs, ideas, or would like to contribute through pull requests, please check out [Contributing to Notchi](CONTRIBUTING.md).
+
 ## Credits
 
-- [Claude Island](https://github.com/farouqaldori/claude-island)
-- [Readout](https://readout.org)
+- [Claude Island](https://github.com/farouqaldori/claude-island) — design inspiration for the app
+- [Readout](https://readout.org) — design inspiration for [notchi.app](https://notchi.app)
+- [Aseprite](https://www.aseprite.org/) — sprite design
 
 ## License
 

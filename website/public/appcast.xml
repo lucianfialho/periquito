@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
+    <channel>
+        <title>Notchi</title>
+        <link>https://updates.notchi.app</link>
+        <description>Notchi app updates</description>
+        <language>en</language>
+        <!-- Items will be added by generate_appcast -->
+        <item>
+            <title>1.0.0</title>
+            <pubDate>Mon, 09 Mar 2026 11:54:32 +0800</pubDate>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/sk-ruban/notchi/releases/download/v1.0.0/Notchi-1.0.0.dmg" length="3487808" type="application/octet-stream"/>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+        </item>
+    </channel>
+</rss>

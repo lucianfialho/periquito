@@ -6,9 +6,20 @@ SOCKET_PATH="/tmp/notchi.sock"
 # Exit silently if socket doesn't exist (app not running)
 [ -S "$SOCKET_PATH" ] || exit 0
 
+# Detect non-interactive (claude -p / --print) sessions
+IS_INTERACTIVE=true
+for CHECK_PID in $PPID $(ps -o ppid= -p $PPID 2>/dev/null | tr -d ' '); do
+    if ps -o args= -p "$CHECK_PID" 2>/dev/null | grep -qE '(^| )(-p|--print)( |$)'; then
+        IS_INTERACTIVE=false
+        break
+    fi
+done
+export NOTCHI_INTERACTIVE=$IS_INTERACTIVE
+
 # Parse input and send to socket using Python
 /usr/bin/python3 -c "
 import json
+import os
 import socket
 import sys
 
@@ -38,6 +49,7 @@ output = {
     'status': input_data.get('status', status_map.get(hook_event, 'unknown')),
     'pid': None,
     'tty': None,
+    'interactive': os.environ.get('NOTCHI_INTERACTIVE', 'true') == 'true',
     'permission_mode': input_data.get('permission_mode', 'default')
 }
 

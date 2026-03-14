@@ -175,6 +175,7 @@ jobs:
           git checkout main
           git pull origin main
           cp /tmp/appcast.xml docs/appcast.xml
-          git add docs/appcast.xml
+          cp /tmp/appcast.xml website/public/appcast.xml
+          git add docs/appcast.xml website/public/appcast.xml
           git diff --cached --quiet && echo "No appcast changes" || git commit -m "chore: update appcast for v$VERSION"
           git push origin main

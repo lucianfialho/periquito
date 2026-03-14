@@ -38,9 +38,11 @@ final class NotchiStateMachine {
                     cwd: event.cwd
                 )
             }
-            startFileWatcher(sessionId: event.sessionId, cwd: event.cwd)
+            if session.isInteractive {
+                startFileWatcher(sessionId: event.sessionId, cwd: event.cwd)
+            }
 
-            if let prompt = event.userPrompt {
+            if session.isInteractive, let prompt = event.userPrompt {
                 Task {
                     let result = await EmotionAnalyzer.shared.analyze(prompt)
                     session.emotionState.recordEmotion(result.emotion, intensity: result.intensity, prompt: prompt)
@@ -49,17 +51,17 @@ final class NotchiStateMachine {
 
         case "PreToolUse":
             if isDone {
-                SoundService.shared.playNotificationSound()
+                SoundService.shared.playNotificationSound(sessionId: event.sessionId, isInteractive: session.isInteractive)
             }
 
         case "PermissionRequest":
-            SoundService.shared.playNotificationSound()
+            SoundService.shared.playNotificationSound(sessionId: event.sessionId, isInteractive: session.isInteractive)
 
         case "PostToolUse":
             scheduleFileSync(sessionId: event.sessionId, cwd: event.cwd)
 
         case "Stop":
-            SoundService.shared.playNotificationSound()
+            SoundService.shared.playNotificationSound(sessionId: event.sessionId, isInteractive: session.isInteractive)
             stopFileWatcher(sessionId: event.sessionId)
             scheduleFileSync(sessionId: event.sessionId, cwd: event.cwd)
 
@@ -67,6 +69,7 @@ final class NotchiStateMachine {
             stopFileWatcher(sessionId: event.sessionId)
             pendingSyncTasks.removeValue(forKey: event.sessionId)?.cancel()
             pendingPositionMarks.removeValue(forKey: event.sessionId)?.cancel()
+            SoundService.shared.clearCooldown(for: event.sessionId)
             Task { await ConversationParser.shared.resetState(for: event.sessionId) }
             if sessionStore.activeSessionCount == 0 {
                 logger.info("Global state: idle")
@@ -75,7 +78,7 @@ final class NotchiStateMachine {
 
         default:
             if isDone && session.task != .idle {
-                SoundService.shared.playNotificationSound()
+                SoundService.shared.playNotificationSound(sessionId: event.sessionId, isInteractive: session.isInteractive)
             }
         }
 

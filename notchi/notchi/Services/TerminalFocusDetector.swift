@@ -8,7 +8,21 @@ struct TerminalFocusDetector {
         "io.alacritty",
         "net.kovidgoyal.kitty",
         "com.github.wez.wezterm",
-        "co.zeit.hyper"
+        "co.zeit.hyper",
+        "com.mitchellh.ghostty",
+        "com.raphaelamorim.rio",
+        "org.tabby",
+        "dev.commandline.waveterm",
+        "dev.warp.Warp-Preview",
+        "org.contourterminal.Contour",
+        "com.microsoft.VSCode",
+        "com.todesktop.230313mzl4w4u92",
+        "com.exafunction.windsurf",
+        "dev.zed.Zed",
+        "com.jetbrains.intellij",
+        "com.jetbrains.intellij.ce",
+        "com.jetbrains.pycharm",
+        "com.jetbrains.pycharm.ce"
     ]
 
     static func isTerminalFocused() -> Bool {
