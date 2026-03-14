@@ -121,46 +121,36 @@ struct ExpandedPanelView: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
+    private var isAnalyzing: Bool {
+        effectiveSession?.isAnalyzingEnglish ?? false
+    }
+
+    private var currentEmotion: PeriquitoEmotion {
+        effectiveSession?.state.emotion ?? .neutral
+    }
+
     private var tipsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !isActivityCollapsed {
                 VStack(alignment: .leading, spacing: 0) {
-                    HStack {
-                        Text("English Tips")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(TerminalColors.secondaryText)
-
-                        Spacer()
-
-                        if let session = effectiveSession {
-                            let goodCount = session.englishTips.filter { $0.type == "good" }.count
-                            let correctionCount = session.englishTips.filter { $0.type == "correction" }.count
-                            HStack(spacing: 6) {
-                                if goodCount > 0 {
-                                    Text("\(goodCount) good")
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundColor(TerminalColors.green)
-                                }
-                                if correctionCount > 0 {
-                                    Text("\(correctionCount) fix")
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundColor(TerminalColors.amber)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.top, 8)
-                    .padding(.bottom, 10)
-
                     ScrollViewReader { proxy in
                         ScrollView(showsIndicators: false) {
-                            VStack(alignment: .leading, spacing: 6) {
+                            VStack(spacing: 8) {
                                 ForEach(tips) { tip in
-                                    EnglishTipRowView(tip: tip)
+                                    ChatTipView(tip: tip, emotion: currentEmotion)
                                         .id(tip.id)
+                                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                                }
+
+                                if isAnalyzing {
+                                    TypingIndicatorView()
+                                        .id("typing")
                                 }
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: tips.count)
+                            .padding(.top, 8)
+                            .padding(.bottom, 4)
+                            .frame(maxWidth: .infinity)
                         }
                         .frame(maxHeight: 200)
                         .onAppear {
@@ -168,10 +158,17 @@ struct ExpandedPanelView: View {
                                 proxy.scrollTo(lastTip.id, anchor: .bottom)
                             }
                         }
-                        .onChange(of: tips.last?.id) { _, newId in
-                            if let id = newId {
+                        .onChange(of: tips.count) { _, _ in
+                            if let lastTip = tips.last {
                                 withAnimation(.easeOut(duration: 0.2)) {
-                                    proxy.scrollTo(id, anchor: .bottom)
+                                    proxy.scrollTo(lastTip.id, anchor: .bottom)
+                                }
+                            }
+                        }
+                        .onChange(of: isAnalyzing) { _, analyzing in
+                            if analyzing {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    proxy.scrollTo("typing", anchor: .bottom)
                                 }
                             }
                         }
@@ -201,59 +198,236 @@ struct ExpandedPanelView: View {
     }
 }
 
-// MARK: - English Tip Row
+// MARK: - Chat-style Tip View
 
-struct EnglishTipRowView: View {
+struct ChatTipView: View {
     let tip: EnglishTip
+    var emotion: PeriquitoEmotion = .neutral
     private var fontSize: AppSettings.FontSize { AppSettings.fontSize }
 
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            // Icon
-            Text(tip.type == "good" ? "✅" : "📝")
-                .font(.system(size: fontSize.tipFont))
+    private static let goodPhrases = [
+        "Solid English.", "Reads naturally.", "Well put.", "Clean grammar.",
+        "No issues here.", "Nailed it.", "Perfect.", "Nice one."
+    ]
 
-            VStack(alignment: .leading, spacing: 2) {
-                // The prompt they wrote
-                Text(tip.prompt)
-                    .font(.system(size: fontSize.promptFont, design: .monospaced))
-                    .foregroundColor(TerminalColors.dimmedText)
-                    .lineLimit(1)
+    private var goodMessage: String {
+        if emotion == .sad {
+            return "Better! Keep going."
+        }
+        let index = abs(tip.id.hashValue) % Self.goodPhrases.count
+        return Self.goodPhrases[index]
+    }
 
-                // The tip/correction or "Good English!"
-                if tip.type == "good" {
-                    Text("Good English!")
-                        .font(.system(size: fontSize.tipFont, weight: .medium))
-                        .foregroundColor(TerminalColors.green)
-                } else if let tipText = tip.tip {
-                    Text(tipText)
-                        .font(.system(size: fontSize.tipFont))
-                        .foregroundColor(TerminalColors.amber)
-                        .fixedSize(horizontal: false, vertical: true)
+    private var goodBubbleColor: Color {
+        switch emotion {
+        case .happy: return TerminalColors.green.opacity(0.18)
+        case .sad: return TerminalColors.green.opacity(0.06)
+        default: return TerminalColors.green.opacity(0.12)
+        }
+    }
+
+    private var correctionBubbleColor: Color {
+        switch emotion {
+        case .sob: return Color(red: 0.9, green: 0.3, blue: 0.2).opacity(0.12)
+        default: return TerminalColors.amber.opacity(0.08)
+        }
+    }
+
+    private var parsedParts: [(wrong: String, right: String, why: String)] {
+        guard let tipText = tip.tip else { return [] }
+        // Split by ";" or by multiple ❌ markers for multi-correction tips
+        let segments = tipText.components(separatedBy: "; ")
+        var parts: [(wrong: String, right: String, why: String)] = []
+
+        for segment in segments {
+            let trimmed = segment.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { continue }
+
+            // Try to parse "❌ X → ✅ Y — Z" format
+            if let arrowRange = trimmed.range(of: " → ") {
+                let wrongPart = String(trimmed[trimmed.startIndex..<arrowRange.lowerBound])
+                    .replacingOccurrences(of: "❌ ", with: "")
+                    .replacingOccurrences(of: "❌", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+                let afterArrow = String(trimmed[arrowRange.upperBound...])
+
+                if let dashRange = afterArrow.range(of: " — ") {
+                    let rightPart = String(afterArrow[afterArrow.startIndex..<dashRange.lowerBound])
+                        .replacingOccurrences(of: "✅ ", with: "")
+                        .replacingOccurrences(of: "✅", with: "")
+                        .trimmingCharacters(in: .whitespaces)
+                    let whyPart = String(afterArrow[dashRange.upperBound...])
+                        .trimmingCharacters(in: .whitespaces)
+                    parts.append((wrong: wrongPart, right: rightPart, why: whyPart))
+                } else {
+                    let rightPart = afterArrow
+                        .replacingOccurrences(of: "✅ ", with: "")
+                        .replacingOccurrences(of: "✅", with: "")
+                        .trimmingCharacters(in: .whitespaces)
+                    parts.append((wrong: wrongPart, right: rightPart, why: ""))
                 }
+            } else {
+                parts.append((wrong: "", right: "", why: trimmed))
+            }
+        }
+        return parts
+    }
 
-                // Category badge
-                if let category = tip.category {
-                    Text(category)
-                        .font(.system(size: fontSize.promptFont - 1, weight: .medium))
-                        .foregroundColor(TerminalColors.secondaryText)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(Color.white.opacity(0.06))
-                        .cornerRadius(3)
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Text("🦜")
+                .font(.system(size: 14))
+
+            VStack(alignment: .leading, spacing: 0) {
+                if tip.type == "good" {
+                    goodBubble
+                } else {
+                    correctionBubbles
                 }
             }
 
             Spacer()
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
-        .background(
-            tip.type == "good"
-                ? TerminalColors.green.opacity(0.05)
-                : TerminalColors.amber.opacity(0.05)
-        )
-        .cornerRadius(6)
+    }
+
+    private var goodBubble: some View {
+        Text(goodMessage)
+            .font(.system(size: fontSize.tipFont))
+            .foregroundColor(emotion == .sad ? TerminalColors.green.opacity(0.7) : TerminalColors.green)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(goodBubbleColor)
+            .cornerRadius(12, corners: [.topLeft, .topRight, .bottomRight])
+    }
+
+    private var correctionBubbles: some View {
+        let parts = parsedParts
+
+        return VStack(alignment: .leading, spacing: 4) {
+            if parts.isEmpty, let tipText = tip.tip {
+                // Fallback: show raw text in a bubble
+                Text(tipText)
+                    .font(.system(size: fontSize.tipFont))
+                    .foregroundColor(.white.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(TerminalColors.amber.opacity(0.12))
+                    .cornerRadius(12, corners: [.topLeft, .topRight, .bottomRight])
+            } else {
+                ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
+                    VStack(alignment: .leading, spacing: 4) {
+                        if !part.wrong.isEmpty {
+                            HStack(spacing: 4) {
+                                Text(part.wrong)
+                                    .font(.system(size: fontSize.tipFont))
+                                    .strikethrough()
+                                    .foregroundColor(TerminalColors.red.opacity(0.8))
+                                Text("→")
+                                    .font(.system(size: fontSize.tipFont))
+                                    .foregroundColor(TerminalColors.dimmedText)
+                                Text(part.right)
+                                    .font(.system(size: fontSize.tipFont, weight: .medium))
+                                    .foregroundColor(TerminalColors.green)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(correctionBubbleColor)
+                            .cornerRadius(10, corners: [.topLeft, .topRight, .bottomRight])
+                        }
+
+                        if !part.why.isEmpty {
+                            Text(part.why)
+                                .font(.system(size: fontSize.promptFont))
+                                .foregroundColor(TerminalColors.dimmedText.opacity(0.7))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.leading, 4)
+                        }
+                    }
+                }
+            }
+
+            if let category = tip.category {
+                Text(category)
+                    .font(.system(size: fontSize.promptFont - 1, weight: .medium))
+                    .foregroundColor(TerminalColors.dimmedText)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(4)
+                    .padding(.leading, 4)
+            }
+        }
+    }
+}
+
+// Helper for selective corner radius (macOS-compatible)
+struct Corner: OptionSet {
+    let rawValue: Int
+    static let topLeft = Corner(rawValue: 1 << 0)
+    static let topRight = Corner(rawValue: 1 << 1)
+    static let bottomLeft = Corner(rawValue: 1 << 2)
+    static let bottomRight = Corner(rawValue: 1 << 3)
+}
+
+extension View {
+    func cornerRadius(_ radius: CGFloat, corners: Corner) -> some View {
+        clipShape(RoundedCorners(radius: radius, corners: corners))
+    }
+}
+
+struct RoundedCorners: Shape {
+    var radius: CGFloat
+    var corners: Corner
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let tl = corners.contains(.topLeft) ? radius : 0
+        let tr = corners.contains(.topRight) ? radius : 0
+        let bl = corners.contains(.bottomLeft) ? radius : 0
+        let br = corners.contains(.bottomRight) ? radius : 0
+
+        path.move(to: CGPoint(x: rect.minX + tl, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - tr, y: rect.minY))
+        if tr > 0 { path.addArc(center: CGPoint(x: rect.maxX - tr, y: rect.minY + tr), radius: tr, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false) }
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
+        if br > 0 { path.addArc(center: CGPoint(x: rect.maxX - br, y: rect.maxY - br), radius: br, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false) }
+        path.addLine(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
+        if bl > 0 { path.addArc(center: CGPoint(x: rect.minX + bl, y: rect.maxY - bl), radius: bl, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false) }
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + tl))
+        if tl > 0 { path.addArc(center: CGPoint(x: rect.minX + tl, y: rect.minY + tl), radius: tl, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false) }
+        return path
+    }
+}
+
+// MARK: - Typing Indicator
+
+struct TypingIndicatorView: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Text("🦜")
+                .font(.system(size: 14))
+
+            TimelineView(.periodic(from: .now, by: 0.4)) { timeline in
+                let phase = Int(timeline.date.timeIntervalSinceReferenceDate / 0.4) % 3
+                HStack(spacing: 3) {
+                    ForEach(0..<3, id: \.self) { i in
+                        let distance = min(abs(i - phase), 3 - abs(i - phase))
+                        Circle()
+                            .fill(Color.white.opacity(0.5))
+                            .frame(width: 5, height: 5)
+                            .opacity(distance == 0 ? 1.0 : (distance == 1 ? 0.5 : 0.2))
+                            .animation(.easeInOut(duration: 0.3), value: phase)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.08))
+            .cornerRadius(12, corners: [.topLeft, .topRight, .bottomRight])
+
+            Spacer()
+        }
     }
 }
 

@@ -51,6 +51,12 @@ struct PanelSettingsView: View {
         }
     }
 
+    private var systemReady: Bool {
+        hooksInstalled && !hooksError && claudeAvailable
+    }
+
+    @State private var setupExpanded = false
+
     private var togglesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Button(action: toggleLaunchAtLogin) {
@@ -60,21 +66,32 @@ struct PanelSettingsView: View {
             }
             .buttonStyle(.plain)
 
-            Button(action: installHooksIfNeeded) {
-                SettingsRowView(icon: "terminal", title: "Hooks") {
-                    statusBadge(hookStatusText, color: hookStatusColor)
+            if systemReady && !setupExpanded {
+                Button(action: { setupExpanded = true }) {
+                    SettingsRowView(icon: "checkmark.circle", title: "System") {
+                        Text("Ready")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(TerminalColors.green)
+                    }
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button(action: installHooksIfNeeded) {
+                    SettingsRowView(icon: "terminal", title: "Hooks") {
+                        statusBadge(hookStatusText, color: hookStatusColor)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                SettingsRowView(icon: "textformat.abc", title: "English Analysis") {
+                    statusBadge(
+                        claudeAvailable ? "Active" : "Claude CLI not found",
+                        color: claudeAvailable ? TerminalColors.green : TerminalColors.red
+                    )
                 }
             }
-            .buttonStyle(.plain)
-
-            SettingsRowView(icon: "textformat.abc", title: "English Analysis") {
-                statusBadge(
-                    claudeAvailable ? "Active" : "Claude CLI not found",
-                    color: claudeAvailable ? TerminalColors.green : TerminalColors.red
-                )
-            }
-            .onAppear { checkClaudeCLI() }
         }
+        .onAppear { checkClaudeCLI() }
     }
 
     private func checkClaudeCLI() {
@@ -115,19 +132,12 @@ struct PanelSettingsView: View {
         Button(action: {
             NSApplication.shared.terminate(nil)
         }) {
-            HStack {
-                Image(systemName: "xmark.circle")
-                    .font(.system(size: 13))
-                Text("Quit Periquito")
-                    .font(.system(size: 12, weight: .medium))
-            }
-            .foregroundColor(TerminalColors.red)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 10)
-            .padding(.horizontal, 12)
-            .background(TerminalColors.red.opacity(0.1))
-            .contentShape(Rectangle())
-            .cornerRadius(8)
+            Text("Quit Periquito")
+                .font(.system(size: 11))
+                .foregroundColor(TerminalColors.dimmedText)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .padding(.bottom, 8)

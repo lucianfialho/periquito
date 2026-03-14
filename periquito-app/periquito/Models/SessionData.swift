@@ -39,6 +39,7 @@ final class SessionData: Identifiable {
     private(set) var recentEvents: [SessionEvent] = []
     private(set) var recentAssistantMessages: [AssistantMessage] = []
     private(set) var englishTips: [EnglishTip] = []
+    var isAnalyzingEnglish: Bool = false
     private(set) var lastUserPrompt: String?
     private(set) var promptSubmitTime: Date?
     private(set) var permissionMode: String = "default"
