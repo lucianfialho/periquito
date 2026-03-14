@@ -5,6 +5,7 @@ struct AppSettings {
     private static let isMutedKey = "isMuted"
     private static let previousSoundKey = "previousNotificationSound"
     private static let isUsageEnabledKey = "isUsageEnabled"
+    private static let fontSizeKey = "fontSize"
 
     static var isUsageEnabled: Bool {
         get { UserDefaults.standard.bool(forKey: isUsageEnabledKey) }
@@ -42,6 +43,49 @@ struct AppSettings {
             previousSound = notificationSound
             notificationSound = .none
             isMuted = true
+        }
+    }
+
+    enum FontSize: String, CaseIterable {
+        case small = "small"
+        case regular = "regular"
+        case large = "large"
+
+        var tipFont: CGFloat {
+            switch self {
+            case .small: return 10
+            case .regular: return 11
+            case .large: return 13
+            }
+        }
+
+        var promptFont: CGFloat {
+            switch self {
+            case .small: return 9
+            case .regular: return 10
+            case .large: return 12
+            }
+        }
+
+        var label: String {
+            switch self {
+            case .small: return "S"
+            case .regular: return "M"
+            case .large: return "L"
+            }
+        }
+    }
+
+    static var fontSize: FontSize {
+        get {
+            guard let raw = UserDefaults.standard.string(forKey: fontSizeKey),
+                  let size = FontSize(rawValue: raw) else {
+                return .regular
+            }
+            return size
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: fontSizeKey)
         }
     }
 

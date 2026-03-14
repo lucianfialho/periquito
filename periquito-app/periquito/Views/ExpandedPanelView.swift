@@ -205,28 +205,29 @@ struct ExpandedPanelView: View {
 
 struct EnglishTipRowView: View {
     let tip: EnglishTip
+    private var fontSize: AppSettings.FontSize { AppSettings.fontSize }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             // Icon
             Text(tip.type == "good" ? "✅" : "📝")
-                .font(.system(size: 12))
+                .font(.system(size: fontSize.tipFont))
 
             VStack(alignment: .leading, spacing: 2) {
                 // The prompt they wrote
                 Text(tip.prompt)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: fontSize.promptFont, design: .monospaced))
                     .foregroundColor(TerminalColors.dimmedText)
                     .lineLimit(1)
 
                 // The tip/correction or "Good English!"
                 if tip.type == "good" {
                     Text("Good English!")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: fontSize.tipFont, weight: .medium))
                         .foregroundColor(TerminalColors.green)
                 } else if let tipText = tip.tip {
                     Text(tipText)
-                        .font(.system(size: 11))
+                        .font(.system(size: fontSize.tipFont))
                         .foregroundColor(TerminalColors.amber)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -234,7 +235,7 @@ struct EnglishTipRowView: View {
                 // Category badge
                 if let category = tip.category {
                     Text(category)
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.system(size: fontSize.promptFont - 1, weight: .medium))
                         .foregroundColor(TerminalColors.secondaryText)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
