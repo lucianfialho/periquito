@@ -9,6 +9,15 @@ struct PendingQuestion {
     let options: [(label: String, description: String?)]
 }
 
+struct EnglishTip: Identifiable {
+    let id = UUID()
+    let timestamp: Date
+    let prompt: String
+    let type: String       // "good", "correction", "skip"
+    let tip: String?
+    let category: String?
+}
+
 @MainActor
 @Observable
 final class SessionData: Identifiable {
@@ -29,6 +38,7 @@ final class SessionData: Identifiable {
     private(set) var lastActivity: Date
     private(set) var recentEvents: [SessionEvent] = []
     private(set) var recentAssistantMessages: [AssistantMessage] = []
+    private(set) var englishTips: [EnglishTip] = []
     private(set) var lastUserPrompt: String?
     private(set) var promptSubmitTime: Date?
     private(set) var permissionMode: String = "default"
@@ -193,6 +203,23 @@ final class SessionData: Identifiable {
 
     func clearAssistantMessages() {
         recentAssistantMessages = []
+    }
+
+    func recordEnglishTip(_ result: EmotionAnalyzer.AnalysisResult, prompt: String) {
+        guard result.type != "skip" else { return }
+        let tip = EnglishTip(
+            timestamp: Date(),
+            prompt: String(prompt.prefix(100)),
+            type: result.type,
+            tip: result.tip,
+            category: result.category
+        )
+        englishTips.append(tip)
+        // Keep last 20 tips
+        while englishTips.count > 20 {
+            englishTips.removeFirst()
+        }
+        lastActivity = Date()
     }
 
     func resetSleepTimer() {

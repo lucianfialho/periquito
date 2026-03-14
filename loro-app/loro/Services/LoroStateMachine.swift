@@ -46,6 +46,7 @@ final class LoroStateMachine {
                 Task {
                     let result = await EmotionAnalyzer.shared.analyze(prompt)
                     session.emotionState.recordEmotion(result.emotion, intensity: result.intensity, prompt: prompt)
+                    session.recordEnglishTip(result, prompt: prompt)
                 }
             }
 

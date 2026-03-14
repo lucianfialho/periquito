@@ -1,24 +1,5 @@
 import SwiftUI
 
-enum ActivityItem: Identifiable {
-    case tool(SessionEvent)
-    case assistant(AssistantMessage)
-
-    var id: String {
-        switch self {
-        case .tool(let event): return "tool-\(event.id.uuidString)"
-        case .assistant(let msg): return "assistant-\(msg.id)"
-        }
-    }
-
-    var timestamp: Date {
-        switch self {
-        case .tool(let event): return event.timestamp
-        case .assistant(let msg): return msg.timestamp
-        }
-    }
-}
-
 struct ExpandedPanelView: View {
     let sessionStore: SessionStore
     let usageService: ClaudeUsageService
@@ -38,20 +19,8 @@ struct ExpandedPanelView: View {
         state.task == .working || state.task == .compacting || state.task == .waiting
     }
 
-    private var hasActivity: Bool {
-        guard let session = effectiveSession else { return false }
-        return !session.recentEvents.isEmpty ||
-               !session.recentAssistantMessages.isEmpty ||
-               session.isProcessing ||
-               showIndicator ||
-               session.lastUserPrompt != nil
-    }
-
-    private var unifiedActivityItems: [ActivityItem] {
-        guard let session = effectiveSession else { return [] }
-        let toolItems = session.recentEvents.map { ActivityItem.tool($0) }
-        let messageItems = session.recentAssistantMessages.map { ActivityItem.assistant($0) }
-        return (toolItems + messageItems).sorted { $0.timestamp < $1.timestamp }
+    private var tips: [EnglishTip] {
+        effectiveSession?.englishTips ?? []
     }
 
     private var shouldShowSessionPicker: Bool {
@@ -139,9 +108,9 @@ struct ExpandedPanelView: View {
             }
 
             VStack(alignment: .leading, spacing: 0) {
-                if hasActivity {
+                if !tips.isEmpty {
                     Divider().background(Color.white.opacity(0.08))
-                    activitySection
+                    tipsSection
                 } else if !isActivityCollapsed {
                     Spacer()
                     emptyState
@@ -170,21 +139,32 @@ struct ExpandedPanelView: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    private var activitySection: some View {
+    private var tipsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !isActivityCollapsed {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
-                        if let session = effectiveSession {
-                            Text("\(session.projectName) #\(session.sessionNumber)")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(TerminalColors.secondaryText)
-                        }
+                        Text("English Tips")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(TerminalColors.secondaryText)
 
                         Spacer()
 
-                        if let mode = effectiveSession?.currentModeDisplay {
-                            ModeBadgeView(mode: mode)
+                        if let session = effectiveSession {
+                            let goodCount = session.englishTips.filter { $0.type == "good" }.count
+                            let correctionCount = session.englishTips.filter { $0.type == "correction" }.count
+                            HStack(spacing: 6) {
+                                if goodCount > 0 {
+                                    Text("\(goodCount) good")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(TerminalColors.green)
+                                }
+                                if correctionCount > 0 {
+                                    Text("\(correctionCount) fix")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(TerminalColors.amber)
+                                }
+                            }
                         }
                     }
                     .padding(.top, 8)
@@ -192,54 +172,28 @@ struct ExpandedPanelView: View {
 
                     ScrollViewReader { proxy in
                         ScrollView(showsIndicators: false) {
-                            VStack(alignment: .leading, spacing: 0) {
-                                if let prompt = effectiveSession?.lastUserPrompt {
-                                    UserPromptBubbleView(text: prompt)
-                                        .frame(maxWidth: .infinity, alignment: .trailing)
-                                        .padding(.bottom, 8)
-                                }
-
-                                ForEach(unifiedActivityItems) { item in
-                                    switch item {
-                                    case .tool(let event):
-                                        ActivityRowView(event: event)
-                                            .id(item.id)
-                                    case .assistant(let message):
-                                        AssistantTextRowView(message: message)
-                                            .id(item.id)
-                                    }
-                                }
-
-                                let questions = effectiveSession?.pendingQuestions ?? []
-                                if !questions.isEmpty {
-                                    QuestionPromptView(questions: questions)
-                                        .id("question-prompt")
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(tips) { tip in
+                                    EnglishTipRowView(tip: tip)
+                                        .id(tip.id)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .frame(maxHeight: 200)
                         .onAppear {
-                            if let lastItem = unifiedActivityItems.last {
-                                proxy.scrollTo(lastItem.id, anchor: .bottom)
+                            if let lastTip = tips.last {
+                                proxy.scrollTo(lastTip.id, anchor: .bottom)
                             }
                         }
-                        .onChange(of: unifiedActivityItems.last?.id) { _, newId in
+                        .onChange(of: tips.last?.id) { _, newId in
                             if let id = newId {
                                 withAnimation(.easeOut(duration: 0.2)) {
                                     proxy.scrollTo(id, anchor: .bottom)
                                 }
                             }
                         }
-                        .onChange(of: effectiveSession?.pendingQuestions.isEmpty) { _, isEmpty in
-                            if isEmpty == false {
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    proxy.scrollTo("question-prompt", anchor: .bottom)
-                                }
-                            }
-                        }
                     }
-
                 }
                 .transition(.opacity)
             }
@@ -248,9 +202,9 @@ struct ExpandedPanelView: View {
 
     private var emptyState: some View {
         let hooksInstalled = HookInstaller.isInstalled()
-        let title = hooksInstalled ? "Waiting for activity" : "Hooks not installed"
+        let title = hooksInstalled ? "Write in English!" : "Hooks not installed"
         let subtitle = hooksInstalled
-            ? "Send a message in Claude Code to start tracking"
+            ? "Loro analyzes your English in Claude Code prompts"
             : "Open settings to set up Claude Code integration"
 
         return VStack(spacing: 8) {
@@ -264,6 +218,63 @@ struct ExpandedPanelView: View {
         .frame(maxWidth: .infinity)
     }
 }
+
+// MARK: - English Tip Row
+
+struct EnglishTipRowView: View {
+    let tip: EnglishTip
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            // Icon
+            Text(tip.type == "good" ? "✅" : "📝")
+                .font(.system(size: 12))
+
+            VStack(alignment: .leading, spacing: 2) {
+                // The prompt they wrote
+                Text(tip.prompt)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(TerminalColors.dimmedText)
+                    .lineLimit(1)
+
+                // The tip/correction or "Good English!"
+                if tip.type == "good" {
+                    Text("Good English!")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(TerminalColors.green)
+                } else if let tipText = tip.tip {
+                    Text(tipText)
+                        .font(.system(size: 11))
+                        .foregroundColor(TerminalColors.amber)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                // Category badge
+                if let category = tip.category {
+                    Text(category)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(TerminalColors.secondaryText)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(3)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 6)
+        .background(
+            tip.type == "good"
+                ? TerminalColors.green.opacity(0.05)
+                : TerminalColors.amber.opacity(0.05)
+        )
+        .cornerRadius(6)
+    }
+}
+
+// MARK: - Supporting Views
 
 struct PanelHeaderButton: View {
     let sfSymbol: String

@@ -6,6 +6,9 @@ SOCKET_PATH="/tmp/loro.sock"
 # Exit silently if socket doesn't exist (app not running)
 [ -S "$SOCKET_PATH" ] || exit 0
 
+# Skip if this is Loro's own analysis process
+[ "$LORO_ANALYSIS_RUNNING" = "1" ] && exit 0
+
 # Detect non-interactive (claude -p / --print) sessions
 IS_INTERACTIVE=true
 for CHECK_PID in $PPID $(ps -o ppid= -p $PPID 2>/dev/null | tr -d ' '); do
