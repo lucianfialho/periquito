@@ -1,4 +1,4 @@
-# Notchi
+# Loro
 
 A macOS notch companion that reacts to Claude Code activity in real-time.
 
@@ -21,9 +21,9 @@ https://github.com/user-attachments/assets/e417bd40-cae8-47c0-998a-905166cf3513
 
 ## Install
 
-1. Download `Notchi-x.x.x.dmg` from the [latest GitHub Release](https://github.com/sk-ruban/notchi/releases/latest)
-2. Open the DMG and drag Notchi to Applications
-3. Launch Notchi — it auto-installs Claude Code hooks on first launch
+1. Download `Loro-x.x.x.dmg` from the [latest GitHub Release](https://github.com/sk-ruban/loro/releases/latest)
+2. Open the DMG and drag Loro to Applications
+3. Launch Loro — it auto-installs Claude Code hooks on first launch
 4. A macOS keychain popup will appear asking to access Claude Code's cached OAuth token (used for API usage stats). Click **Always Allow** so it won't prompt again on future launches
 
    <img src="assets/keychain-popup.png" alt="Keychain access popup" width="450">
@@ -32,7 +32,7 @@ https://github.com/user-attachments/assets/e417bd40-cae8-47c0-998a-905166cf3513
 
    <img src="assets/emotion-settings.png" alt="Emotion analysis settings" width="400">
 
-6. Start using Claude Code and watch Notchi react
+6. Start using Claude Code and watch Loro react
 
 ## How it works
 
@@ -40,18 +40,18 @@ https://github.com/user-attachments/assets/e417bd40-cae8-47c0-998a-905166cf3513
 Claude Code --> Hooks (shell scripts) --> Unix Socket --> Event Parser --> State Machine --> Animated Sprites
 ```
 
-Notchi registers shell script hooks with Claude Code on launch. When Claude Code emits events (tool use, thinking, prompts, session start/end), the hook script sends JSON payloads to a Unix socket. The app parses these events, runs them through a state machine that maps to sprite animations (idle, working, sleeping, compacting, waiting), and uses the Anthropic API to analyze user prompt sentiment for emotional reactions.
+Loro registers shell script hooks with Claude Code on launch. When Claude Code emits events (tool use, thinking, prompts, session start/end), the hook script sends JSON payloads to a Unix socket. The app parses these events, runs them through a state machine that maps to sprite animations (idle, working, sleeping, compacting, waiting), and uses the Anthropic API to analyze user prompt sentiment for emotional reactions.
 
 Each Claude Code session gets its own sprite on the grass island. Clicking expands the notch panel to show a live activity feed, session info, and API usage stats.
 
 ## Contributing
 
-If you have any bugs, ideas, or would like to contribute through pull requests, please check out [Contributing to Notchi](CONTRIBUTING.md).
+If you have any bugs, ideas, or would like to contribute through pull requests, please check out [Contributing to Loro](CONTRIBUTING.md).
 
 ## Credits
 
 - [Claude Island](https://github.com/farouqaldori/claude-island) — design inspiration for the app
-- [Readout](https://readout.org) — design inspiration for [notchi.app](https://notchi.app)
+- [Readout](https://readout.org) — design inspiration for [loro.app](https://loro.app)
 - [Aseprite](https://www.aseprite.org/) — sprite design
 
 ## License

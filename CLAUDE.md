@@ -1,14 +1,14 @@
 # Loro — Language Learning Tamagotchi for Claude Code
 
 ## What is this project?
-Loro is a macOS notch app (forked from [Notchi](https://github.com/sk-ruban/notchi)) that helps developers learn English (and other languages) while they code. It's a Tamagotchi-style parrot that lives in your MacBook notch and reacts to your English usage in Claude Code.
+Loro is a macOS notch app (forked from [Loro](https://github.com/sk-ruban/loro)) that helps developers learn English (and other languages) while they code. It's a Tamagotchi-style parrot that lives in your MacBook notch and reacts to your English usage in Claude Code.
 
 ## Origin
-- Forked from `sk-ruban/notchi` (MIT License)
+- Forked from `sk-ruban/loro` (MIT License)
 - Original project: a coding companion that shows animated sprites in the macOS notch reacting to Claude Code activity
 - Our goal: transform it into a language learning companion
 
-## Architecture (inherited from Notchi)
+## Architecture (inherited from Loro)
 ```
 Claude Code Hooks → Unix Socket → Event Parser → State Machine → SwiftUI Sprites (notch)
 ```
@@ -50,7 +50,7 @@ The scripts are in `~/Code/learnEnglish/` — they should be migrated/integrated
 - **Icons**: 3D icons from thiings.co
 
 ## TODO
-1. Rename all notchi references to loro
+1. Rename all loro references to loro
 2. Replace sprites with parrot character (states: idle, happy, confused, sad, learning)
 3. Integrate language analysis hooks (replace coding activity hooks)
 4. Add knowledge base panel (stats, accuracy, streak)
