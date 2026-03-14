@@ -1,14 +1,14 @@
-# Loro — Language Learning Tamagotchi for Claude Code
+# Periquito — Language Learning Tamagotchi for Claude Code
 
 ## What is this project?
-Loro is a macOS notch app (forked from [Loro](https://github.com/sk-ruban/loro)) that helps developers learn English (and other languages) while they code. It's a Tamagotchi-style parrot that lives in your MacBook notch and reacts to your English usage in Claude Code.
+Periquito is a macOS notch app (forked from [Periquito](https://github.com/sk-ruban/periquito)) that helps developers learn English (and other languages) while they code. It's a Tamagotchi-style parrot that lives in your MacBook notch and reacts to your English usage in Claude Code.
 
 ## Origin
-- Forked from `sk-ruban/loro` (MIT License)
+- Forked from `sk-ruban/periquito` (MIT License)
 - Original project: a coding companion that shows animated sprites in the macOS notch reacting to Claude Code activity
 - Our goal: transform it into a language learning companion
 
-## Architecture (inherited from Loro)
+## Architecture (inherited from Periquito)
 ```
 Claude Code Hooks → Unix Socket → Event Parser → State Machine → SwiftUI Sprites (notch)
 ```
@@ -18,7 +18,7 @@ Claude Code Hooks → Unix Socket → Event Parser → State Machine → SwiftUI
 - **Frontend**: SwiftUI native macOS app
 - **Rendering**: Animated sprites in the MacBook notch area
 
-## What Loro should become
+## What Periquito should become
 - A **parrot Tamagotchi** that lives in the notch
 - **Parrot states**: happy (good English), confused (grammar error + shows correction), sad (long time without English), growing (accuracy improving)
 - **Knowledge base**: tracks all corrections in `~/.english-learning/history.jsonl`
@@ -50,7 +50,7 @@ The scripts are in `~/Code/learnEnglish/` — they should be migrated/integrated
 - **Icons**: 3D icons from thiings.co
 
 ## TODO
-1. Rename all loro references to loro
+1. Rename all periquito references to periquito
 2. Replace sprites with parrot character (states: idle, happy, confused, sad, learning)
 3. Integrate language analysis hooks (replace coding activity hooks)
 4. Add knowledge base panel (stats, accuracy, streak)
@@ -58,6 +58,6 @@ The scripts are in `~/Code/learnEnglish/` — they should be migrated/integrated
 6. Update install flow
 
 ## Brand
-- **Name**: Loro ("parrot" in Spanish/Italian)
+- **Name**: Periquito ("parrot" in Spanish/Italian)
 - **Mascot**: 3D parrot from thiings.co
 - **Sounds**: Glass (correct), Pop (correction)

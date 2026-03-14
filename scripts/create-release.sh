@@ -2,22 +2,22 @@
 set -euo pipefail
 
 # =============================================================================
-# Loro Release Script
+# Periquito Release Script
 # Usage: ./scripts/create-release.sh <version>
 # Example: ./scripts/create-release.sh 1.1.0
 # =============================================================================
 
 # --- Configuration ---
 TEAM_ID="SXT98GH5HN"
-BUNDLE_ID="com.ruban.loro"
-SCHEME="loro"
-PROJECT_PATH="loro/loro.xcodeproj"
+BUNDLE_ID="com.ruban.periquito"
+SCHEME="periquito"
+PROJECT_PATH="periquito/periquito.xcodeproj"
 APPCAST_OUTPUT="docs/appcast.xml"
-APP_NAME="Loro"
+APP_NAME="Periquito"
 
 # TODO: Set your notarytool keychain profile name.
-# Create one with: xcrun notarytool store-credentials "loro-notarize" --apple-id "you@example.com" --team-id "SXT98GH5HN"
-NOTARYTOOL_PROFILE="loro-notarize"
+# Create one with: xcrun notarytool store-credentials "periquito-notarize" --apple-id "you@example.com" --team-id "SXT98GH5HN"
+NOTARYTOOL_PROFILE="periquito-notarize"
 
 # Sparkle tools directory — override with SPARKLE_BIN_DIR env var.
 # Falls back to searching DerivedData for the Sparkle build artifacts.
@@ -143,7 +143,7 @@ echo "Exported ${APP_PATH}"
 # --- Step 4: Notarize and staple ---
 step "Step 3/6: Notarize and staple"
 
-NOTARIZE_ZIP="${BUILD_DIR}/loro-submit.zip"
+NOTARIZE_ZIP="${BUILD_DIR}/periquito-submit.zip"
 echo "Creating zip for notarization..."
 ditto -c -k --keepParent "$APP_PATH" "$NOTARIZE_ZIP"
 
@@ -222,7 +222,7 @@ cp "$DMG_PATH" "$APPCAST_STAGING/"
 
 "$GENERATE_APPCAST" \
     --ed-key-file "$SPARKLE_KEY_FILE" \
-    --download-url-prefix "https://github.com/sk-ruban/loro/releases/download/v${VERSION}/" \
+    --download-url-prefix "https://github.com/sk-ruban/periquito/releases/download/v${VERSION}/" \
     -o "$APPCAST_OUTPUT" \
     "$APPCAST_STAGING"
 

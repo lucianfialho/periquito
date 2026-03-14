@@ -54,8 +54,8 @@ jobs:
       - name: Resolve SPM dependencies
         run: |
           xcodebuild -resolvePackageDependencies \
-            -project loro/loro.xcodeproj \
-            -scheme loro
+            -project periquito/periquito.xcodeproj \
+            -scheme periquito
 
       - name: Verify Sparkle tools
         id: sparkle
@@ -77,10 +77,10 @@ jobs:
       - name: Build and archive
         run: |
           xcodebuild archive \
-            -project loro/loro.xcodeproj \
-            -scheme loro \
+            -project periquito/periquito.xcodeproj \
+            -scheme periquito \
             -configuration Release \
-            -archivePath $RUNNER_TEMP/loro.xcarchive \
+            -archivePath $RUNNER_TEMP/periquito.xcarchive \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Developer ID Application" \
             DEVELOPMENT_TEAM=SXT98GH5HN
@@ -91,7 +91,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :teamID string SXT98GH5HN" $RUNNER_TEMP/export.plist
 
           xcodebuild -exportArchive \
-            -archivePath $RUNNER_TEMP/loro.xcarchive \
+            -archivePath $RUNNER_TEMP/periquito.xcarchive \
             -exportOptionsPlist $RUNNER_TEMP/export.plist \
             -exportPath $RUNNER_TEMP/export
 
@@ -102,16 +102,16 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           ditto -c -k --keepParent \
-            "$RUNNER_TEMP/export/Loro.app" \
-            "$RUNNER_TEMP/loro-submit.zip"
+            "$RUNNER_TEMP/export/Periquito.app" \
+            "$RUNNER_TEMP/periquito-submit.zip"
 
-          xcrun notarytool submit "$RUNNER_TEMP/loro-submit.zip" \
+          xcrun notarytool submit "$RUNNER_TEMP/periquito-submit.zip" \
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_PASSWORD" \
             --wait
 
-          xcrun stapler staple "$RUNNER_TEMP/export/Loro.app"
+          xcrun stapler staple "$RUNNER_TEMP/export/Periquito.app"
 
       - name: Create DMG
         env:
@@ -119,10 +119,10 @@ jobs:
         run: |
           DMG_DIR=$RUNNER_TEMP/dmg_staging
           mkdir -p "$DMG_DIR"
-          cp -R "$RUNNER_TEMP/export/Loro.app" "$DMG_DIR/"
+          cp -R "$RUNNER_TEMP/export/Periquito.app" "$DMG_DIR/"
           ln -s /Applications "$DMG_DIR/Applications"
-          hdiutil create -volname "Loro" -srcfolder "$DMG_DIR" \
-            -ov -format UDZO "$RUNNER_TEMP/Loro-$VERSION.dmg"
+          hdiutil create -volname "Periquito" -srcfolder "$DMG_DIR" \
+            -ov -format UDZO "$RUNNER_TEMP/Periquito-$VERSION.dmg"
 
       - name: Write Sparkle key to temp file
         env:
@@ -137,7 +137,7 @@ jobs:
           SPARKLE_BIN_DIR: ${{ steps.sparkle.outputs.SPARKLE_BIN_DIR }}
         run: |
           "$SPARKLE_BIN_DIR/sign_update" --ed-key-file "$RUNNER_TEMP/sparkle_key" \
-            "$RUNNER_TEMP/Loro-$VERSION.dmg"
+            "$RUNNER_TEMP/Periquito-$VERSION.dmg"
 
       - name: Update appcast.xml
         env:
@@ -145,12 +145,12 @@ jobs:
           SPARKLE_BIN_DIR: ${{ steps.sparkle.outputs.SPARKLE_BIN_DIR }}
         run: |
           mkdir -p $RUNNER_TEMP/appcast_staging
-          cp "$RUNNER_TEMP/Loro-$VERSION.dmg" $RUNNER_TEMP/appcast_staging/
+          cp "$RUNNER_TEMP/Periquito-$VERSION.dmg" $RUNNER_TEMP/appcast_staging/
           cp docs/appcast.xml $RUNNER_TEMP/appcast_staging/ 2>/dev/null || true
 
           "$SPARKLE_BIN_DIR/generate_appcast" \
             --ed-key-file "$RUNNER_TEMP/sparkle_key" \
-            --download-url-prefix "https://github.com/sk-ruban/loro/releases/download/v$VERSION/" \
+            --download-url-prefix "https://github.com/sk-ruban/periquito/releases/download/v$VERSION/" \
             -o docs/appcast.xml \
             $RUNNER_TEMP/appcast_staging
 
@@ -161,7 +161,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ runner.temp }}/Loro-${{ steps.version.outputs.VERSION }}.dmg
+          files: ${{ runner.temp }}/Periquito-${{ steps.version.outputs.VERSION }}.dmg
           generate_release_notes: true
 
       - name: Commit updated appcast
