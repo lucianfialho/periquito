@@ -117,7 +117,7 @@ struct PanelSettingsView: View {
     }
 
     private func openGitHubRepo() {
-        NSWorkspace.shared.open(URL(string: "https://github.com/lucianfialho/loro")!)
+        NSWorkspace.shared.open(URL(string: "https://github.com/lucianfialho/periquito")!)
     }
 
     private var quitSection: some View {
