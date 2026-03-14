@@ -49,6 +49,9 @@ final class PeriquitoStateMachine {
                     session.emotionState.recordEmotion(result.emotion, intensity: result.intensity, prompt: prompt)
                     session.recordEnglishTip(result, prompt: prompt)
                     session.isAnalyzingEnglish = false
+
+                    let stats = await HistoryStatsLoader.load()
+                    LevelManager.shared.awardXP(for: result.type, rollingAccuracy: stats.rollingAccuracy ?? 0)
                 }
             }
 

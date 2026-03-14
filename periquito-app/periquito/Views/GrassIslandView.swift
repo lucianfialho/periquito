@@ -189,6 +189,12 @@ private struct GrassSpriteView: View {
                 isAnimating: true
             )
             .frame(width: SpriteLayout.size, height: SpriteLayout.size)
+            .overlay(alignment: .bottomTrailing) {
+                Text(LevelManager.shared.level.emoji)
+                    .font(.system(size: 12))
+                    .shadow(color: .black, radius: 1, x: 0, y: 0.5)
+                    .offset(x: 4, y: 4)
+            }
             .background(alignment: .bottom) {
                 if glowOpacity > 0 {
                     Ellipse()

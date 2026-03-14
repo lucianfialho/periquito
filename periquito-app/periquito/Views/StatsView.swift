@@ -2,6 +2,7 @@ import SwiftUI
 
 struct StatsView: View {
     let stats: HistoryStats?
+    let levelManager: LevelManager
     private var fontSize: AppSettings.FontSize { AppSettings.fontSize }
 
     private var evaluated: Int { stats?.totalEvaluated ?? 0 }
@@ -24,6 +25,10 @@ struct StatsView: View {
 
     private var statsContent: some View {
         VStack(spacing: 16) {
+            // Level row (single line: emoji + name + bar + XP)
+            levelRow
+                .padding(.bottom, 2)
+
             // Accuracy hero
             VStack(spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
@@ -65,10 +70,87 @@ struct StatsView: View {
                     color: TerminalColors.amber
                 )
             }
+
+            // Accuracy hint for next level
+            if let hint = accuracyHint {
+                Text(hint)
+                    .font(.system(size: 10))
+                    .foregroundColor(TerminalColors.amber)
+            }
+
+            // Decay message (shown once per session)
+            if levelManager.lastDecayAmount > 0 {
+                Text("-\(levelManager.lastDecayAmount) XP  (\(levelManager.lastDecayDays) days missed)")
+                    .font(.system(size: 10))
+                    .foregroundColor(TerminalColors.amber)
+            }
         }
-        .padding(.top, 16)
+        .padding(.top, 12)
         .padding(.horizontal, 4)
     }
+
+    // MARK: - Level Row
+
+    private var levelRow: some View {
+        let level = levelManager.level
+        let xp = levelManager.xp
+
+        return VStack(alignment: .leading, spacing: 4) {
+            if level == .phoenix {
+                // Max level
+                HStack {
+                    Text("\(level.emoji) \(level.name)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(TerminalColors.primaryText)
+                        .scaleEffect(levelManager.didLevelUp ? 1.1 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.5), value: levelManager.didLevelUp)
+                    Spacer()
+                    Text("Max Level")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(TerminalColors.green)
+                }
+            } else if let next = level.nextLevel {
+                HStack(spacing: 8) {
+                    Text("\(level.emoji) \(level.name)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(TerminalColors.primaryText)
+                        .scaleEffect(levelManager.didLevelUp ? 1.1 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.5), value: levelManager.didLevelUp)
+
+                    xpProgressBar(current: xp, from: level.xpThreshold, to: next.xpThreshold)
+
+                    Text("\(xp) / \(next.xpThreshold)")
+                        .font(.system(size: 10))
+                        .foregroundColor(TerminalColors.dimmedText)
+                        .fixedSize()
+                }
+            }
+        }
+    }
+
+    private func xpProgressBar(current: Int, from: Int, to: Int) -> some View {
+        let range = max(to - from, 1)
+        let progress = min(max(Double(current - from) / Double(range), 0), 1)
+
+        return GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.10))
+                Capsule().fill(TerminalColors.green)
+                    .frame(width: geo.size.width * progress)
+                    .animation(.easeOut(duration: 0.4), value: progress)
+            }
+        }
+        .frame(height: 6)
+    }
+
+    private var accuracyHint: String? {
+        guard let next = levelManager.level.nextLevel,
+              let rolling = stats?.rollingAccuracy,
+              rolling < next.minAccuracy else { return nil }
+        return "Need \(next.minAccuracy)% accuracy (currently \(rolling)%)"
+    }
+
+    // MARK: - Stat Cards
 
     private func statCard(label: String, value: String, color: Color) -> some View {
         VStack(spacing: 4) {

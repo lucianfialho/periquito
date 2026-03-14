@@ -120,7 +120,7 @@ struct ExpandedPanelView: View {
                     }
                 } else {
                     if !isActivityCollapsed {
-                        StatsView(stats: historyStats)
+                        StatsView(stats: historyStats, levelManager: LevelManager.shared)
                     }
                 }
 

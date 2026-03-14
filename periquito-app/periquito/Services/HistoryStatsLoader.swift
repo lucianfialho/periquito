@@ -6,6 +6,7 @@ private let logger = Logger(subsystem: "com.ruban.periquito", category: "History
 struct HistoryStats: Sendable {
     let totalGood: Int
     let totalCorrections: Int
+    let rollingAccuracy: Int?
 
     var totalEvaluated: Int { totalGood + totalCorrections }
 
@@ -15,7 +16,7 @@ struct HistoryStats: Sendable {
         return totalGood * 100 / totalEvaluated
     }
 
-    static let empty = HistoryStats(totalGood: 0, totalCorrections: 0)
+    static let empty = HistoryStats(totalGood: 0, totalCorrections: 0, rollingAccuracy: nil)
 }
 
 enum HistoryStatsLoader {
@@ -40,6 +41,7 @@ enum HistoryStatsLoader {
 
             var good = 0
             var corrections = 0
+            var evaluatedTypes: [String] = []
 
             for line in data.split(separator: "\n") {
                 let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -51,14 +53,28 @@ enum HistoryStatsLoader {
                 }
 
                 switch type {
-                case "good": good += 1
-                case "correction": corrections += 1
-                default: break // skip "skip" and unknown types
+                case "good":
+                    good += 1
+                    evaluatedTypes.append(type)
+                case "correction":
+                    corrections += 1
+                    evaluatedTypes.append(type)
+                default: break
                 }
             }
 
-            logger.info("Loaded stats: \(good) good, \(corrections) corrections")
-            return HistoryStats(totalGood: good, totalCorrections: corrections)
+            // Rolling accuracy: last 50 evaluated entries
+            let rolling: Int?
+            let recent = evaluatedTypes.suffix(50)
+            if recent.isEmpty {
+                rolling = nil
+            } else {
+                let recentGood = recent.filter { $0 == "good" }.count
+                rolling = recentGood * 100 / recent.count
+            }
+
+            logger.info("Loaded stats: \(good) good, \(corrections) corrections, rolling: \(rolling ?? -1)%")
+            return HistoryStats(totalGood: good, totalCorrections: corrections, rollingAccuracy: rolling)
         }.value
     }
 }

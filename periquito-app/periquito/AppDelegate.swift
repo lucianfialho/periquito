@@ -43,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startHookServices() {
         HookInstaller.installIfNeeded()
+        LevelManager.shared.applyDecay()
         SocketServer.shared.start { event in
             Task { @MainActor in
                 PeriquitoStateMachine.shared.handleEvent(event)

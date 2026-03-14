@@ -1,108 +1,108 @@
 {
-  "name": "Stats Tab in Expanded Panel",
-  "vision": "Add an in-app stats view (accuracy %, prompt counts) to the Periquito notch panel, reading from ~/.english-learning/history.jsonl, with a tab bar to switch between Tips and Stats.",
+  "name": "Streak System with Visual Feedback",
+  "vision": "Add a daily streak counter (≥3 prompts/day) computed from history.jsonl, displayed in the stats tab and as a notch badge, with best-streak tracking and real-time updates.",
   "features": [
     {
-      "name": "History Parser Service",
+      "name": "Streak Computation",
       "tasks": [
         {
           "id": "1",
-          "title": "Create HistoryStats model and JSONL parser",
-          "description": "Create a new file `periquito-app/periquito/Services/HistoryStatsLoader.swift`. Define a `HistoryStats` struct with fields: `totalGood: Int`, `totalCorrections: Int`, `accuracy: Int` (0-100, computed as good/(good+corrections)*100, 0 if no data). Add a static async function `load() -> HistoryStats` that reads `~/.english-learning/history.jsonl`, parses each line as JSON, counts entries where type == \"good\" and type == \"correction\" (skip entries with type == \"skip\"), and returns the computed stats. Use the same `historyDir` path pattern as EmotionAnalyzer. If the file doesn't exist or is empty, return zeroed stats. Run parsing on a background thread with `Task.detached` and deliver results as a Sendable struct.",
+          "title": "Add streak computation to HistoryStatsLoader",
+          "description": "Modify `periquito-app/periquito/Services/HistoryStatsLoader.swift`. Add `currentStreak: Int`, `bestStreak: Int`, and `todayCount: Int` fields to `HistoryStats`. In the `load()` function, alongside existing parsing, also extract the calendar date from each entry's ISO8601 `date` field using `Calendar.current`. Build a dictionary of `[DateString: Int]` counting evaluated prompts per day (good + correction only). A 'qualifying day' has ≥3 prompts. After parsing, compute:\n\n1. `todayCount` — number of evaluated prompts with today's date.\n2. `currentStreak` — walk backwards from today: if today qualifies (≥3), include it and check yesterday, etc. If today has <3, start checking from yesterday (streak not broken until day ends with <3). Count consecutive qualifying days.\n3. `bestStreak` — iterate all dates sorted ascending, find the longest consecutive qualifying run.\n\nUse `Calendar.current.startOfDay(for:)` for date grouping. Update the `empty` static to include zeroed streak fields.",
           "priority": 1,
           "passes": false,
           "tests": {
             "command": "xcodebuild -project periquito-app/periquito.xcodeproj -scheme periquito -configuration Debug build 2>&1 | tail -5"
           },
           "acceptance": [
-            "HistoryStatsLoader.swift exists in Services/",
-            "HistoryStats struct has totalGood, totalCorrections, accuracy fields",
-            "load() is async and reads from ~/.english-learning/history.jsonl",
-            "Skipped entries (type == 'skip') are excluded from counts",
-            "Returns zeroed stats if file missing or empty — no crashes",
-            "Build succeeds with no errors"
+            "HistoryStats has currentStreak, bestStreak, and todayCount fields",
+            "Qualifying day requires ≥3 evaluated prompts",
+            "Current streak counts consecutive qualifying days touching today or yesterday",
+            "Today with <3 prompts does not break streak (checks from yesterday)",
+            "Best streak is the longest qualifying run in all history",
+            "todayCount reflects prompts analyzed today",
+            "HistoryStats.empty includes zeroed streak fields",
+            "Build succeeds"
           ],
           "context": {
             "files": [
-              "periquito-app/periquito/Services/EmotionAnalyzer.swift"
+              "periquito-app/periquito/Services/HistoryStatsLoader.swift"
             ],
             "hints": [
-              "Follow EmotionAnalyzer's pattern for historyDir/historyFile paths",
-              "HistoryStats should be a simple struct, not Observable",
-              "Use JSONSerialization to parse each line (same format EmotionAnalyzer writes)"
+              "Parse ISO8601 date strings to get calendar day — use ISO8601DateFormatter then Calendar.current.startOfDay()",
+              "Dictionary key can be a formatted date string like yyyy-MM-dd for grouping",
+              "For best streak: sort unique qualifying dates, walk forward counting consecutive days",
+              "All streak fields are Int, not optional — 0 means no streak"
             ]
           }
         }
       ]
     },
     {
-      "name": "Stats View UI",
+      "name": "Streak Display in Stats Tab",
       "tasks": [
         {
           "id": "2",
-          "title": "Create StatsView with accuracy and counts display",
-          "description": "Create `periquito-app/periquito/Views/StatsView.swift`. Build a SwiftUI view that receives `HistoryStats` and displays: (1) A large accuracy percentage number with '%' suffix, color-coded using TerminalColors (green >= 80, amber 50-79, red < 50), showing '—' if no data. (2) Below that, a row with three stat cards: 'Evaluated' (totalGood + totalCorrections), 'Good' (green, totalGood count), 'Corrections' (amber, totalCorrections count). Use TerminalColors for all styling. Match the existing panel aesthetic (dark background, light text, system fonts). Max width constraint of 402pt. Add an empty state: if totalGood + totalCorrections == 0, show 'Start writing in English to see your progress!' using TerminalColors.secondaryText and dimmedText, matching the existing emptyState pattern in ExpandedPanelView.",
+          "title": "Add streak section to StatsView",
+          "description": "Modify `periquito-app/periquito/Views/StatsView.swift`. Add a streak section between the level row and the accuracy hero. Layout:\n\n1. A row with two stat cards side by side:\n   - Left card: '🔥 N' (current streak in days) with label 'Current Streak'. Use TerminalColors.amber for the number.\n   - Right card: '⭐ N' (best streak in days) with label 'Best Streak'. Use TerminalColors.dimmedText for the number.\n2. If currentStreak >= bestStreak AND currentStreak > 0, show 'New best!' text in TerminalColors.green below the cards.\n3. Below the cards, show today's progress toward qualifying: 'M/3 today' in dimmed text. If todayCount >= 3, show '✓ Today counts!' in green instead.\n4. When streak is 0, show '0 days' (not hidden).\n\nReuse the existing `statCard` helper pattern. Read streak data from the `stats` parameter (HistoryStats).",
           "priority": 2,
           "passes": false,
           "tests": {
             "command": "xcodebuild -project periquito-app/periquito.xcodeproj -scheme periquito -configuration Debug build 2>&1 | tail -5"
           },
           "acceptance": [
-            "StatsView.swift exists in Views/",
-            "Accuracy displayed as large number with color coding (green/amber/red)",
-            "Shows '—' when no data instead of '0%'",
-            "Three stat cards: Evaluated, Good (green), Corrections (amber)",
-            "Empty state message shown when totalGood + totalCorrections == 0",
-            "Uses TerminalColors consistently — no hardcoded colors",
-            "Build succeeds with no errors"
+            "Current streak shown with fire emoji and amber color",
+            "Best streak shown with star emoji and dimmed color",
+            "'New best!' shown when current >= best and > 0",
+            "Today's progress shown as 'M/3 today' or '✓ Today counts!'",
+            "0-day streak displays cleanly as '0'",
+            "Section placed between level row and accuracy hero",
+            "Build succeeds"
           ],
           "context": {
             "files": [
-              "periquito-app/periquito/UI/TerminalColors.swift",
-              "periquito-app/periquito/Views/ExpandedPanelView.swift"
+              "periquito-app/periquito/Views/StatsView.swift",
+              "periquito-app/periquito/UI/TerminalColors.swift"
             ],
             "hints": [
-              "Use AppSettings.fontSize for consistent font sizing",
-              "TerminalColors: green, amber, red, primaryText, secondaryText, dimmedText, subtleBackground",
-              "Look at the emptyState var in ExpandedPanelView for styling reference"
+              "Reuse the statCard pattern already in StatsView",
+              "Use HStack(spacing: 12) for the two streak cards, same as the existing stat cards row",
+              "todayCount comes from stats?.todayCount ?? 0"
             ]
           }
         }
       ]
     },
     {
-      "name": "Tab Bar Navigation",
+      "name": "Streak Badge in Notch",
       "tasks": [
         {
           "id": "3",
-          "title": "Add tab bar to ExpandedPanelView and integrate StatsView",
-          "description": "Modify `periquito-app/periquito/Views/ExpandedPanelView.swift`. Add a `@State private var selectedTab: PanelTab = .tips` enum (cases: .tips, .stats). In the `activityContent` function, insert a tab bar below the divider (before tipsSection). The tab bar has two buttons: 'Tips' and 'Stats', styled as underlined text when selected, dimmed when not. Below the tab bar, conditionally show either the existing tipsSection (when .tips) or StatsView (when .stats). For StatsView, add a `@State private var historyStats: HistoryStats?` property. Load stats via `HistoryStatsLoader.load()` in `.task {}` on the StatsView container, and reload when `tips.count` changes using `.onChange(of: tips.count)`. Pass the loaded stats to StatsView. The tab bar should animate transitions with `.easeInOut(duration: 0.2)`.",
+          "title": "Add streak fire badge to GrassIslandView sprites",
+          "description": "Modify `periquito-app/periquito/Views/GrassIslandView.swift`. In `GrassSpriteView`, add a second overlay badge at `alignment: .bottomLeading` (the level badge is already at `.bottomTrailing`). Show '🔥N' where N is the current streak from `HistoryStats`. Only display when streak ≥ 1. Use 10pt font, with black shadow for contrast against the notch background. Offset with `offset(x: -4, y: 4)` to mirror the level badge position.\n\nSince `GrassSpriteView` doesn't have access to stats, you'll need to read the streak from a shared source. The simplest approach: add a `@State` streak property to `GrassIslandView` that loads on appear and refreshes via `onChange(of:)` on the session store. Or, add `currentStreak` as a stored property on `LevelManager` that gets updated when stats are loaded. Choose the approach that requires least plumbing.",
           "priority": 3,
           "passes": false,
           "tests": {
             "command": "xcodebuild -project periquito-app/periquito.xcodeproj -scheme periquito -configuration Debug build 2>&1 | tail -5"
           },
           "acceptance": [
-            "PanelTab enum defined with .tips and .stats cases",
-            "Tab bar visible with 'Tips' and 'Stats' buttons",
-            "Tips tab selected by default",
-            "Switching tabs shows correct content with animation",
-            "Stats reload when tips.count changes (real-time update)",
-            "Stats load on first appear via .task {}",
-            "Tab bar uses TerminalColors styling",
-            "Build succeeds with no errors"
+            "'🔥N' badge visible on sprites when streak ≥ 1",
+            "Badge hidden when streak is 0",
+            "Badge positioned at bottom-left (opposite from level badge at bottom-right)",
+            "Uses 10pt font with black shadow for contrast",
+            "Badge visible on both active session sprites and idle sprite",
+            "No visual conflict with the existing level emoji badge",
+            "Build succeeds"
           ],
           "context": {
             "files": [
-              "periquito-app/periquito/Views/ExpandedPanelView.swift",
-              "periquito-app/periquito/Views/StatsView.swift",
-              "periquito-app/periquito/Services/HistoryStatsLoader.swift"
+              "periquito-app/periquito/Views/GrassIslandView.swift",
+              "periquito-app/periquito/Services/LevelManager.swift"
             ],
             "hints": [
-              "Add PanelTab enum inside ExpandedPanelView or at file level",
-              "Tab bar goes between the Divider and the ScrollViewReader in activityContent",
-              "Keep the working indicator (WorkingIndicatorView) visible regardless of tab",
-              "Use .opacity() or conditional to preserve tips scroll position when switching to stats"
+              "Level badge is at .bottomTrailing with offset(x: 4, y: 4) — mirror to .bottomLeading with offset(x: -4, y: 4)",
+              "Simplest approach: add var currentStreak: Int to LevelManager, update it from ExpandedPanelView when stats load",
+              "GrassSpriteView is private — add the overlay inside it, reading from LevelManager.shared.currentStreak"
             ]
           }
         }
