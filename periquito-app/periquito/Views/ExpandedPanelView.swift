@@ -12,6 +12,7 @@ struct ExpandedPanelView: View {
     @Binding var isActivityCollapsed: Bool
     @State private var selectedTab: PanelTab = .tips
     @State private var historyStats: HistoryStats?
+    var quizManager: SpacedRepetitionManager = .shared
 
     private var effectiveSession: SessionData? {
         sessionStore.effectiveSession
@@ -112,7 +113,9 @@ struct ExpandedPanelView: View {
                 }
 
                 if selectedTab == .tips {
-                    if !tips.isEmpty {
+                    if quizManager.quizState != .idle {
+                        quizSection
+                    } else if !tips.isEmpty {
                         tipsSection
                     } else if !isActivityCollapsed {
                         Spacer()
@@ -179,6 +182,35 @@ struct ExpandedPanelView: View {
 
     private func loadStats() async {
         historyStats = await HistoryStatsLoader.load()
+    }
+
+    private var quizSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if !isActivityCollapsed {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 8) {
+                        // Show recent tips above quiz
+                        ForEach(tips.suffix(3)) { tip in
+                            ChatTipView(tip: tip, emotion: currentEmotion)
+                        }
+
+                        QuizBubbleView(
+                            quizState: quizManager.quizState,
+                            onSubmit: { answer in
+                                quizManager.submitAnswer(answer)
+                            },
+                            onDismiss: {
+                                quizManager.dismissQuiz()
+                            }
+                        )
+                    }
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+                    .frame(maxWidth: .infinity)
+                }
+                .frame(maxHeight: 200)
+            }
+        }
     }
 
     private var tipsSection: some View {

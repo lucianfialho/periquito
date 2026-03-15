@@ -3,6 +3,7 @@ import SwiftUI
 struct StatsView: View {
     let stats: HistoryStats?
     let levelManager: LevelManager
+    var quizManager: SpacedRepetitionManager = .shared
     private var fontSize: AppSettings.FontSize { AppSettings.fontSize }
 
     private var evaluated: Int { stats?.totalEvaluated ?? 0 }
@@ -76,6 +77,22 @@ struct StatsView: View {
                 Text(hint)
                     .font(.system(size: 10))
                     .foregroundColor(TerminalColors.amber)
+            }
+
+            // Spaced repetition stats
+            if quizManager.items.count > 0 {
+                HStack(spacing: 12) {
+                    statCard(
+                        label: "Due Reviews",
+                        value: "\(quizManager.dueCount)",
+                        color: quizManager.dueCount > 0 ? TerminalColors.amber : TerminalColors.green
+                    )
+                    statCard(
+                        label: "Mastered",
+                        value: "\(quizManager.masteredCount)",
+                        color: TerminalColors.green
+                    )
+                }
             }
 
             // Decay message (shown once per session)

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import os.log
 
@@ -11,6 +12,7 @@ final class PeriquitoStateMachine {
     let sessionStore = SessionStore.shared
 
     private var emotionDecayTimer: Task<Void, Never>?
+    private var idleQuizTimer: Task<Void, Never>?
     private var pendingSyncTasks: [String: Task<Void, Never>] = [:]
     private var pendingPositionMarks: [String: Task<Void, Never>] = [:]
     private var fileWatchers: [String: (source: DispatchSourceFileSystemObject, fd: Int32)] = [:]
@@ -24,6 +26,7 @@ final class PeriquitoStateMachine {
 
     private init() {
         startEmotionDecayTimer()
+        startIdleQuizTimer()
     }
 
     func handleEvent(_ event: HookEvent) {
@@ -52,6 +55,11 @@ final class PeriquitoStateMachine {
 
                     let stats = await HistoryStatsLoader.load()
                     LevelManager.shared.awardXP(for: result.type, rollingAccuracy: stats.rollingAccuracy ?? 0)
+
+                    // Sync new corrections to spaced repetition queue
+                    if result.type == "correction" {
+                        await SpacedRepetitionManager.shared.syncFromHistory()
+                    }
                 }
             }
 
@@ -175,4 +183,37 @@ final class PeriquitoStateMachine {
         }
     }
 
+    private func startIdleQuizTimer() {
+        let idleDetector = IdleDetector.shared
+        idleDetector.start()
+
+        // Sync review items from history on startup
+        Task {
+            await SpacedRepetitionManager.shared.syncFromHistory()
+        }
+
+        idleQuizTimer = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { return }
+
+                if idleDetector.shouldTriggerQuiz() {
+                    let quizManager = SpacedRepetitionManager.shared
+                    // Sync latest corrections before picking a quiz
+                    await quizManager.syncFromHistory()
+
+                    if quizManager.quizState == .idle && quizManager.startQuiz() {
+                        idleDetector.recordQuizTriggered()
+                        // Expand the notch to show the quiz
+                        NotchPanelManager.shared.expand()
+                        // Play a gentle sound
+                        if let sound = NSSound(named: NSSound.Name("Pop")) {
+                            sound.play()
+                        }
+                        logger.info("Triggered spaced repetition quiz (idle on: \(idleDetector.detectedApp ?? "unknown"))")
+                    }
+                }
+            }
+        }
+    }
 }

@@ -1,7 +1,7 @@
 import AppKit
 
 struct TerminalFocusDetector {
-    private static let terminalBundleIds: Set<String> = [
+    static let terminalBundleIds: Set<String> = [
         "com.apple.Terminal",
         "com.googlecode.iterm2",
         "dev.warp.Warp-Stable",

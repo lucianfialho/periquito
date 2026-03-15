@@ -151,6 +151,10 @@ private struct GrassSpriteView: View {
     let totalWidth: CGFloat
     var glowOpacity: Double = 0
 
+    @State private var walkOffset: CGFloat = 0
+    @State private var walkDirection: CGFloat = 1 // 1 = right, -1 = left
+    @State private var walkTimer: Task<Void, Never>?
+
     private let swayDuration: Double = 2.0
     private var bobAmplitude: CGFloat {
         guard state.bobAmplitude > 0 else { return 0 }
@@ -163,7 +167,7 @@ private struct GrassSpriteView: View {
     }
 
     private var isAnimatingMotion: Bool {
-        bobAmplitude > 0 || swayAmplitude > 0 || state.emotion == .sob
+        bobAmplitude > 0 || swayAmplitude > 0 || state.emotion == .sob || state.canWalk
     }
 
     private var bobDuration: Double {
@@ -179,6 +183,12 @@ private struct GrassSpriteView: View {
 
     private static let sobTrembleAmplitude: CGFloat = 0.3
 
+    // Walking boundaries (points from center)
+    private var walkRange: CGFloat {
+        let usableWidth = totalWidth * SpriteLayout.usableWidthFraction
+        return usableWidth * 0.35 // walk ~35% of usable area each direction
+    }
+
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !isAnimatingMotion)) { timeline in
             SpriteSheetView(
@@ -189,11 +199,13 @@ private struct GrassSpriteView: View {
                 isAnimating: true
             )
             .frame(width: SpriteLayout.size, height: SpriteLayout.size)
+            .scaleEffect(x: walkDirection >= 0 ? 1 : -1, y: 1, anchor: .center)
             .overlay(alignment: .bottomTrailing) {
                 Text(LevelManager.shared.level.emoji)
                     .font(.system(size: 12))
                     .shadow(color: .black, radius: 1, x: 0, y: 0.5)
                     .offset(x: 4, y: 4)
+                    .scaleEffect(x: walkDirection >= 0 ? 1 : -1, y: 1, anchor: .center)
             }
             .background(alignment: .bottom) {
                 if glowOpacity > 0 {
@@ -206,9 +218,48 @@ private struct GrassSpriteView: View {
             }
             .rotationEffect(.degrees(swayDegrees(at: timeline.date)), anchor: .bottom)
             .offset(
-                x: SpriteLayout.xOffset(xPosition: xPosition, totalWidth: totalWidth) + trembleOffset(at: timeline.date, amplitude: state.emotion == .sob ? Self.sobTrembleAmplitude : 0),
+                x: SpriteLayout.xOffset(xPosition: xPosition, totalWidth: totalWidth) + walkOffset + trembleOffset(at: timeline.date, amplitude: state.emotion == .sob ? Self.sobTrembleAmplitude : 0),
                 y: yOffset + bobOffset(at: timeline.date, duration: bobDuration, amplitude: bobAmplitude)
             )
+        }
+        .onAppear { startWalking() }
+        .onDisappear { walkTimer?.cancel() }
+        .onChange(of: state.canWalk) { _, canWalk in
+            if canWalk {
+                startWalking()
+            } else {
+                walkTimer?.cancel()
+            }
+        }
+    }
+
+    private func startWalking() {
+        walkTimer?.cancel()
+        guard state.canWalk else { return }
+
+        walkTimer = Task {
+            while !Task.isCancelled {
+                // Random delay between walks
+                let range = state.walkFrequencyRange
+                let delay = Double.random(in: range)
+                try? await Task.sleep(for: .seconds(delay))
+                guard !Task.isCancelled, state.canWalk else { break }
+
+                // Pick a random target within walk range
+                let target = CGFloat.random(in: -walkRange...walkRange)
+
+                // Flip direction based on movement
+                let newDirection: CGFloat = target > walkOffset ? 1 : -1
+
+                await MainActor.run {
+                    if newDirection != walkDirection {
+                        walkDirection = newDirection
+                    }
+                    withAnimation(.easeInOut(duration: 2.0)) {
+                        walkOffset = target
+                    }
+                }
+            }
         }
     }
 }
