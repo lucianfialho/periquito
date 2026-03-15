@@ -50,6 +50,18 @@ struct QuizBubbleView: View {
                     .background(TerminalColors.red.opacity(0.08))
                     .cornerRadius(8)
 
+                // Hint: describe what kind of error to look for
+                HStack(alignment: .top, spacing: 4) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 9))
+                        .foregroundColor(TerminalColors.amber.opacity(0.7))
+                        .padding(.top, 2)
+                    Text("Focus on: \(Self.hintForCategory(item.category))")
+                        .font(.system(size: fontSize.promptFont))
+                        .foregroundColor(TerminalColors.dimmedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 HStack(spacing: 4) {
                     Image(systemName: "tag")
                         .font(.system(size: 8))
@@ -259,5 +271,22 @@ struct QuizBubbleView: View {
 
     private var randomTipPrefix: String {
         Self.correctTipPrefixes.randomElement() ?? "Remember:"
+    }
+
+    private static func hintForCategory(_ category: String) -> String {
+        switch category.lowercased() {
+        case "grammar":
+            return "verb tense, articles, or sentence structure"
+        case "phrasing":
+            return "how a native speaker would say this"
+        case "punctuation":
+            return "commas, periods, or other punctuation"
+        case "spelling":
+            return "check the spelling carefully"
+        case "synonym", "word_choice":
+            return "is this the right word for the context?"
+        default:
+            return "something about the \(category)"
+        }
     }
 }
