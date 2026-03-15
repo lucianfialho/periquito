@@ -1,7 +1,7 @@
 import Foundation
 import os.log
 
-private let logger = Logger(subsystem: "com.ruban.periquito", category: "SessionStore")
+private let logger = Logger(subsystem: "com.lucianfialho.periquito", category: "SessionStore")
 
 @MainActor
 @Observable

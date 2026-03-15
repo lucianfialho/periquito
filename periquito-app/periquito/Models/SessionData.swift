@@ -1,7 +1,7 @@
 import Foundation
 import os.log
 
-private let logger = Logger(subsystem: "com.ruban.periquito", category: "SessionData")
+private let logger = Logger(subsystem: "com.lucianfialho.periquito", category: "SessionData")
 
 struct PendingQuestion {
     let question: String

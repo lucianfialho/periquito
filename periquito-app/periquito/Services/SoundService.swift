@@ -1,7 +1,7 @@
 import AppKit
 import os.log
 
-private let logger = Logger(subsystem: "com.ruban.periquito", category: "SoundService")
+private let logger = Logger(subsystem: "com.lucianfialho.periquito", category: "SoundService")
 
 @MainActor
 @Observable

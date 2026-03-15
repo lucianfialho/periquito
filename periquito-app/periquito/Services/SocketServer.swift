@@ -1,7 +1,7 @@
 import Foundation
 import os.log
 
-private let logger = Logger(subsystem: "com.ruban.periquito", category: "SocketServer")
+private let logger = Logger(subsystem: "com.lucianfialho.periquito", category: "SocketServer")
 
 typealias HookEventHandler = @Sendable (HookEvent) -> Void
 
@@ -12,7 +12,7 @@ final class SocketServer {
     private var serverSocket: Int32 = -1
     private var acceptSource: DispatchSourceRead?
     private var eventHandler: HookEventHandler?
-    private let queue = DispatchQueue(label: "com.ruban.periquito.socket", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "com.lucianfialho.periquito.socket", qos: .userInitiated)
 
     private init() {}
 

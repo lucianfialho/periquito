@@ -1,7 +1,7 @@
 import Foundation
 import os.log
 
-private let logger = Logger(subsystem: "com.ruban.periquito", category: "HistoryStats")
+private let logger = Logger(subsystem: "com.lucianfialho.periquito", category: "HistoryStats")
 
 struct HistoryStats: Sendable {
     let totalGood: Int

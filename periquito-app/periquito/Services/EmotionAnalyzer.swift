@@ -1,7 +1,7 @@
 import Foundation
 import os.log
 
-private let logger = Logger(subsystem: "com.ruban.periquito", category: "EnglishAnalyzer")
+private let logger = Logger(subsystem: "com.lucianfialho.periquito", category: "EnglishAnalyzer")
 
 private struct EnglishAnalysisResult: Decodable, Sendable {
     let type: String          // "correction", "good", "skip"

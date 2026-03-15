@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import os.log
 
-private let logger = Logger(subsystem: "com.ruban.periquito", category: "IdleDetector")
+private let logger = Logger(subsystem: "com.lucianfialho.periquito", category: "IdleDetector")
 
 @MainActor
 @Observable

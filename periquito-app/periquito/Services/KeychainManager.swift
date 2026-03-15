@@ -3,7 +3,7 @@ import Security
 
 enum KeychainManager {
     private static let claudeCodeService = "Claude Code-credentials"
-    private static let periquitoService = "com.ruban.periquito"
+    private static let periquitoService = "com.lucianfialho.periquito"
     private static let anthropicApiKeyAccount = "anthropicApiKey"
     private static let cachedOAuthTokenAccount = "cachedOAuthToken"
 
