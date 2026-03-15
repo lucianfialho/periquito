@@ -125,27 +125,68 @@ struct QuizBubbleView: View {
 
     // MARK: - Result
 
+    private static let correctPhrases = [
+        "Nailed it!", "You remembered!", "Great recall!",
+        "Well done!", "Sharp memory!", "Exactly right!",
+        "Perfect!", "You've got this!", "Solid answer!",
+    ]
+
+    private static let correctTipPrefixes = [
+        "Remember:", "Quick rule:", "Why it works:",
+        "The key here:", "Good to know:", "Pro tip:",
+    ]
+
     private func resultBubble(correct: Bool, explanation: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 6) {
                 Text("🦜")
                     .font(.system(size: 14))
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
+                    // Header: praise or encouragement
                     HStack(spacing: 6) {
                         Image(systemName: correct ? "checkmark.circle.fill" : "xmark.circle.fill")
                             .foregroundColor(correct ? TerminalColors.green : TerminalColors.red)
-                        Text(correct ? "Correct!" : "Not quite...")
+                        Text(correct ? randomCorrectPhrase : "Not quite...")
                             .font(.system(size: fontSize.tipFont, weight: .semibold))
                             .foregroundColor(correct ? TerminalColors.green : TerminalColors.red)
                     }
 
-                    Text(explanation)
-                        .font(.system(size: fontSize.tipFont))
-                        .foregroundColor(correct ? TerminalColors.green.opacity(0.8) : TerminalColors.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if correct {
+                        // Show the correct sentence
+                        let parts = explanation.components(separatedBy: " — ")
+                        let sentence = parts.first ?? explanation
+                        let tip = parts.count > 1 ? parts.dropFirst().joined(separator: " — ") : nil
 
-                    if !correct {
+                        Text(sentence)
+                            .font(.system(size: fontSize.tipFont, weight: .medium))
+                            .foregroundColor(TerminalColors.green)
+
+                        // Show the grammar/rule tip for reinforcement
+                        if let tip, !tip.isEmpty {
+                            HStack(alignment: .top, spacing: 4) {
+                                Image(systemName: "lightbulb.fill")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(TerminalColors.amber)
+                                    .padding(.top, 2)
+                                Text("\(randomTipPrefix) \(tip)")
+                                    .font(.system(size: fontSize.promptFont))
+                                    .foregroundColor(TerminalColors.secondaryText)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+
+                        // Progress info
+                        if let quiz = currentQuiz {
+                            progressBadge(quiz: quiz)
+                        }
+                    } else {
+                        // Wrong answer: show correction
+                        Text(explanation)
+                            .font(.system(size: fontSize.tipFont))
+                            .foregroundColor(TerminalColors.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+
                         Text("This will come back for review soon.")
                             .font(.system(size: fontSize.promptFont))
                             .foregroundColor(TerminalColors.dimmedText)
@@ -174,5 +215,49 @@ struct QuizBubbleView: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private var currentQuiz: QuizItem? {
+        if case .asking(let item) = quizState { return item }
+        return SpacedRepetitionManager.shared.currentQuiz
+    }
+
+    private func progressBadge(quiz: QuizItem) -> some View {
+        let streak = quiz.correctCount
+        let box = quiz.box
+
+        return HStack(spacing: 8) {
+            if streak > 1 {
+                HStack(spacing: 3) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 9))
+                    Text("\(streak) in a row")
+                        .font(.system(size: fontSize.promptFont - 1, weight: .medium))
+                }
+                .foregroundColor(TerminalColors.amber)
+            }
+
+            HStack(spacing: 3) {
+                ForEach(1...5, id: \.self) { i in
+                    Circle()
+                        .fill(i <= box ? TerminalColors.green : Color.white.opacity(0.15))
+                        .frame(width: 5, height: 5)
+                }
+            }
+
+            if box >= 5 {
+                Text("Mastered!")
+                    .font(.system(size: fontSize.promptFont - 1, weight: .semibold))
+                    .foregroundColor(TerminalColors.green)
+            }
+        }
+    }
+
+    private var randomCorrectPhrase: String {
+        Self.correctPhrases.randomElement() ?? "Correct!"
+    }
+
+    private var randomTipPrefix: String {
+        Self.correctTipPrefixes.randomElement() ?? "Remember:"
     }
 }

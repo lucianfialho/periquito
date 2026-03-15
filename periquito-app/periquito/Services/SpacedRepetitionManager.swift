@@ -101,7 +101,12 @@ final class SpacedRepetitionManager {
 
         let explanation: String
         if isCorrect {
-            explanation = quiz.correctSentence
+            // Include the rule/tip so the user reinforces WHY it's correct
+            if quiz.explanation.isEmpty {
+                explanation = quiz.correctSentence
+            } else {
+                explanation = "\(quiz.correctSentence) — \(quiz.explanation)"
+            }
         } else {
             explanation = "\(quiz.correctSentence) — \(quiz.explanation)"
         }
