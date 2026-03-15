@@ -57,7 +57,7 @@ final class EmotionAnalyzer {
             // Map result to emotion
             switch result.type {
             case "good":
-                return AnalysisResult(emotion: "happy", intensity: 0.7, type: "good", tip: nil, category: nil)
+                return AnalysisResult(emotion: "happy", intensity: 0.7, type: "good", tip: result.tip, category: result.category)
             case "correction":
                 return AnalysisResult(emotion: "sad", intensity: 0.6, type: "correction", tip: result.tip, category: result.category)
             default:
@@ -86,7 +86,10 @@ final class EmotionAnalyzer {
             {"type":"correction","tip":"the tip text here","category":"grammar|spelling|word_choice|phrasing|punctuation"}. \
             The tip format should be: ❌ [what they said] → ✅ [correction] — [brief why]. \
             If the text is NOT in \(Self.language), respond with: {"type":"skip"}. \
-            If the \(Self.language) is good, respond with: {"type":"good"}. \
+            If the \(Self.language) is good, respond with a helpful tip — suggest a synonym, \
+            a more natural phrasing, an idiom, a phrasal verb, or a vocabulary upgrade related to what they wrote. \
+            Format: {"type":"good","tip":"💡 tip text here","category":"vocabulary|idiom|phrasal_verb|synonym|expression"}. \
+            Keep the tip short (under 80 chars), practical, and relevant to their text. \
             Text: "\(prompt)"
             """
 

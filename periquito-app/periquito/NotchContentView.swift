@@ -33,8 +33,8 @@ struct NotchContentView: View {
 
     private var panelAnimation: Animation {
         isExpanded
-            ? .spring(response: 0.42, dampingFraction: 0.8)
-            : .spring(response: 0.45, dampingFraction: 1.0)
+            ? .spring(response: 0.5, dampingFraction: 0.75, blendDuration: 0.1)
+            : .spring(response: 0.35, dampingFraction: 0.9)
     }
 
     private var sideWidth: CGFloat {
@@ -158,10 +158,12 @@ struct NotchContentView: View {
                     )
                     .transition(
                         .asymmetric(
-                            insertion: .scale(scale: 0.8, anchor: .top)
+                            insertion: .scale(scale: 0.92, anchor: .top)
                                 .combined(with: .opacity)
-                                .animation(.smooth(duration: 0.35)),
-                            removal: .opacity.animation(.easeOut(duration: 0.15))
+                                .animation(.spring(response: 0.45, dampingFraction: 0.8)),
+                            removal: .scale(scale: 0.95, anchor: .top)
+                                .combined(with: .opacity)
+                                .animation(.easeOut(duration: 0.2))
                         )
                     )
                 }

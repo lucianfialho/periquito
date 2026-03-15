@@ -375,13 +375,37 @@ struct ChatTipView: View {
     }
 
     private var goodBubble: some View {
-        Text(goodMessage)
-            .font(.system(size: fontSize.tipFont))
-            .foregroundColor(emotion == .sad ? TerminalColors.green.opacity(0.7) : TerminalColors.green)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(goodBubbleColor)
-            .cornerRadius(12, corners: [.topLeft, .topRight, .bottomRight])
+        VStack(alignment: .leading, spacing: 4) {
+            Text(goodMessage)
+                .font(.system(size: fontSize.tipFont))
+                .foregroundColor(emotion == .sad ? TerminalColors.green.opacity(0.7) : TerminalColors.green)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(goodBubbleColor)
+                .cornerRadius(12, corners: [.topLeft, .topRight, .bottomRight])
+
+            if let tipText = tip.tip, !tipText.isEmpty {
+                Text(tipText)
+                    .font(.system(size: fontSize.promptFont))
+                    .foregroundColor(TerminalColors.dimmedText.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(10, corners: [.topLeft, .topRight, .bottomRight])
+            }
+
+            if let category = tip.category {
+                Text(category)
+                    .font(.system(size: fontSize.promptFont - 1, weight: .medium))
+                    .foregroundColor(TerminalColors.dimmedText)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(4)
+                    .padding(.leading, 4)
+            }
+        }
     }
 
     private var correctionBubbles: some View {

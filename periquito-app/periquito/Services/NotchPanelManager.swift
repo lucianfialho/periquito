@@ -7,6 +7,7 @@ final class NotchPanelManager {
 
     private(set) var isExpanded = false
     private(set) var isPinned = false
+    var isHovering = false
     private(set) var notchSize: CGSize = .zero
     private(set) var notchRect: CGRect = .zero
     private(set) var panelRect: CGRect = .zero
@@ -81,6 +82,7 @@ final class NotchPanelManager {
         guard isExpanded else { return }
         isExpanded = false
         isPinned = false
+        isHovering = false
     }
 
     func toggle() {
