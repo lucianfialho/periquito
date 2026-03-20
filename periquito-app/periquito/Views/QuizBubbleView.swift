@@ -5,8 +5,7 @@ struct QuizBubbleView: View {
     let onSubmit: (String) -> Void
     let onDismiss: () -> Void
 
-    @State private var userAnswer = ""
-    @FocusState private var isInputFocused: Bool
+    @State private var selectedAnswer: String?
     private var fontSize: AppSettings.FontSize { AppSettings.fontSize }
 
     var body: some View {
@@ -14,7 +13,6 @@ struct QuizBubbleView: View {
             switch quizState {
             case .asking(let item):
                 questionBubble(item: item)
-                answerInput
             case .evaluating:
                 questionLoading
             case .result(let correct, let explanation):
@@ -25,50 +23,54 @@ struct QuizBubbleView: View {
         }
     }
 
-    // MARK: - Question
+    // MARK: - Question (multiple choice)
 
     private func questionBubble(item: QuizItem) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Text("🦜")
                 .font(.system(size: 14))
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Quick review!")
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Which is correct?")
                     .font(.system(size: fontSize.tipFont, weight: .semibold))
                     .foregroundColor(TerminalColors.amber)
 
-                Text("How would you correct this?")
-                    .font(.system(size: fontSize.tipFont))
-                    .foregroundColor(TerminalColors.secondaryText)
-
-                Text(item.incorrectSentence)
-                    .font(.system(size: fontSize.tipFont + 1, weight: .medium))
-                    .foregroundColor(TerminalColors.red.opacity(0.9))
-                    .italic()
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(TerminalColors.red.opacity(0.08))
-                    .cornerRadius(8)
-
-                // Hint: describe what kind of error to look for
-                HStack(alignment: .top, spacing: 4) {
-                    Image(systemName: "lightbulb.fill")
-                        .font(.system(size: 9))
-                        .foregroundColor(TerminalColors.amber.opacity(0.7))
-                        .padding(.top, 2)
-                    Text("Focus on: \(Self.hintForCategory(item.category))")
+                // Show explanation as context
+                if !item.explanation.isEmpty {
+                    Text(item.explanation)
                         .font(.system(size: fontSize.promptFont))
                         .foregroundColor(TerminalColors.dimmedText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                HStack(spacing: 4) {
-                    Image(systemName: "tag")
-                        .font(.system(size: 8))
-                    Text(item.category)
-                        .font(.system(size: fontSize.promptFont - 1, weight: .medium))
+                // Multiple choice buttons — wrong vs correct (shuffled)
+                let options = Self.shuffledOptions(item: item)
+                VStack(spacing: 6) {
+                    ForEach(options, id: \.self) { option in
+                        Button(action: {
+                            selectedAnswer = option
+                            onSubmit(option)
+                        }) {
+                            Text(option)
+                                .font(.system(size: fontSize.tipFont, weight: .medium))
+                                .foregroundColor(TerminalColors.primaryText)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.white.opacity(0.08))
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .foregroundColor(TerminalColors.dimmedText)
+
+                // Dismiss
+                Button(action: onDismiss) {
+                    Text("Skip")
+                        .font(.system(size: fontSize.promptFont))
+                        .foregroundColor(TerminalColors.dimmedText)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -79,49 +81,11 @@ struct QuizBubbleView: View {
         }
     }
 
-    // MARK: - Answer Input
-
-    private var answerInput: some View {
-        HStack(spacing: 8) {
-            Text("You:")
-                .font(.system(size: fontSize.promptFont, weight: .medium))
-                .foregroundColor(TerminalColors.dimmedText)
-
-            TextField("Type the correct sentence...", text: $userAnswer)
-                .textFieldStyle(.plain)
-                .font(.system(size: fontSize.tipFont))
-                .foregroundColor(TerminalColors.primaryText)
-                .focused($isInputFocused)
-                .onSubmit {
-                    guard !userAnswer.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                    onSubmit(userAnswer)
-                    userAnswer = ""
-                }
-
-            Button(action: {
-                guard !userAnswer.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                onSubmit(userAnswer)
-                userAnswer = ""
-            }) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 18))
-                    .foregroundColor(userAnswer.isEmpty ? TerminalColors.dimmedText : TerminalColors.green)
-            }
-            .buttonStyle(.plain)
-            .disabled(userAnswer.trimmingCharacters(in: .whitespaces).isEmpty)
-
-            Button(action: onDismiss) {
-                Image(systemName: "xmark.circle")
-                    .font(.system(size: 14))
-                    .foregroundColor(TerminalColors.dimmedText)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(Color.white.opacity(0.06))
-        .cornerRadius(10)
-        .onAppear { isInputFocused = true }
+    private static func shuffledOptions(item: QuizItem) -> [String] {
+        // Take just the core part (before any " / " alternatives)
+        let correct = item.correctSentence.components(separatedBy: " / ").first ?? item.correctSentence
+        let wrong = item.incorrectSentence
+        return [correct, wrong].shuffled()
     }
 
     // MARK: - Loading
@@ -130,7 +94,6 @@ struct QuizBubbleView: View {
         HStack(alignment: .top, spacing: 6) {
             Text("🦜")
                 .font(.system(size: 14))
-
             TypingIndicatorView()
         }
     }
@@ -143,11 +106,6 @@ struct QuizBubbleView: View {
         "Perfect!", "You've got this!", "Solid answer!",
     ]
 
-    private static let correctTipPrefixes = [
-        "Remember:", "Quick rule:", "Why it works:",
-        "The key here:", "Good to know:", "Pro tip:",
-    ]
-
     private func resultBubble(correct: Bool, explanation: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 6) {
@@ -155,53 +113,32 @@ struct QuizBubbleView: View {
                     .font(.system(size: 14))
 
                 VStack(alignment: .leading, spacing: 6) {
-                    // Header: praise or encouragement
                     HStack(spacing: 6) {
                         Image(systemName: correct ? "checkmark.circle.fill" : "xmark.circle.fill")
                             .foregroundColor(correct ? TerminalColors.green : TerminalColors.red)
-                        Text(correct ? randomCorrectPhrase : "Not quite...")
+                        Text(correct ? (Self.correctPhrases.randomElement() ?? "Correct!") : "Not quite...")
                             .font(.system(size: fontSize.tipFont, weight: .semibold))
                             .foregroundColor(correct ? TerminalColors.green : TerminalColors.red)
                     }
 
-                    if correct {
-                        // Show the correct sentence
-                        let parts = explanation.components(separatedBy: " — ")
-                        let sentence = parts.first ?? explanation
-                        let tip = parts.count > 1 ? parts.dropFirst().joined(separator: " — ") : nil
+                    // Show the correct answer and explanation
+                    let parts = explanation.components(separatedBy: " — ")
+                    let sentence = parts.first ?? explanation
+                    let tip = parts.count > 1 ? parts.dropFirst().joined(separator: " — ") : nil
 
-                        Text(sentence)
-                            .font(.system(size: fontSize.tipFont, weight: .medium))
-                            .foregroundColor(TerminalColors.green)
+                    Text(sentence)
+                        .font(.system(size: fontSize.tipFont, weight: .medium))
+                        .foregroundColor(correct ? TerminalColors.green : TerminalColors.secondaryText)
 
-                        // Show the grammar/rule tip for reinforcement
-                        if let tip, !tip.isEmpty {
-                            HStack(alignment: .top, spacing: 4) {
-                                Image(systemName: "lightbulb.fill")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(TerminalColors.amber)
-                                    .padding(.top, 2)
-                                Text("\(randomTipPrefix) \(tip)")
-                                    .font(.system(size: fontSize.promptFont))
-                                    .foregroundColor(TerminalColors.secondaryText)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-
-                        // Progress info
-                        if let quiz = currentQuiz {
-                            progressBadge(quiz: quiz)
-                        }
-                    } else {
-                        // Wrong answer: show correction
-                        Text(explanation)
-                            .font(.system(size: fontSize.tipFont))
-                            .foregroundColor(TerminalColors.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text("This will come back for review soon.")
+                    if let tip, !tip.isEmpty {
+                        Text(tip)
                             .font(.system(size: fontSize.promptFont))
                             .foregroundColor(TerminalColors.dimmedText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if let quiz = currentQuiz {
+                        progressBadge(quiz: quiz)
                     }
                 }
                 .padding(.horizontal, 10)
@@ -212,7 +149,6 @@ struct QuizBubbleView: View {
                 Spacer()
             }
 
-            // Dismiss button
             HStack {
                 Spacer()
                 Button(action: onDismiss) {
@@ -262,31 +198,6 @@ struct QuizBubbleView: View {
                     .font(.system(size: fontSize.promptFont - 1, weight: .semibold))
                     .foregroundColor(TerminalColors.green)
             }
-        }
-    }
-
-    private var randomCorrectPhrase: String {
-        Self.correctPhrases.randomElement() ?? "Correct!"
-    }
-
-    private var randomTipPrefix: String {
-        Self.correctTipPrefixes.randomElement() ?? "Remember:"
-    }
-
-    private static func hintForCategory(_ category: String) -> String {
-        switch category.lowercased() {
-        case "grammar":
-            return "verb tense, articles, or sentence structure"
-        case "phrasing":
-            return "how a native speaker would say this"
-        case "punctuation":
-            return "commas, periods, or other punctuation"
-        case "spelling":
-            return "check the spelling carefully"
-        case "synonym", "word_choice":
-            return "is this the right word for the context?"
-        default:
-            return "something about the \(category)"
         }
     }
 }

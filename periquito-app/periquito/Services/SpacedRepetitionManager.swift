@@ -84,15 +84,9 @@ final class SpacedRepetitionManager {
         guard let quiz = currentQuiz else { return }
         quizState = .evaluating
 
-        // Simple evaluation: normalize and compare
-        let normalizedAnswer = answer.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let normalizedCorrect = quiz.correctSentence.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-
-        // Remove trailing punctuation for comparison
-        let cleanAnswer = normalizedAnswer.trimmingCharacters(in: CharacterSet.punctuationCharacters)
-        let cleanCorrect = normalizedCorrect.trimmingCharacters(in: CharacterSet.punctuationCharacters)
-
-        let isCorrect = cleanAnswer == cleanCorrect || levenshteinSimilarity(cleanAnswer, cleanCorrect) > 0.85
+        // Multiple choice: compare selected option against correct sentence
+        let correct = quiz.correctSentence.components(separatedBy: " / ").first ?? quiz.correctSentence
+        let isCorrect = answer == correct
 
         // Update the item
         if let index = items.firstIndex(where: { $0.id == quiz.id }) {
