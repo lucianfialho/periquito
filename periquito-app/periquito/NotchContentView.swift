@@ -19,10 +19,8 @@ struct NotchContentView: View {
     var panelManager: NotchPanelManager = .shared
     var usageService: ClaudeUsageService = .shared
     @State private var showingPanelSettings = false
-    @State private var showingSessionActivity = false
     @State private var isMuted = AppSettings.isMuted
     @State private var isActivityCollapsed = false
-    @State private var hoveredSessionId: String?
 
     private var sessionStore: SessionStore {
         stateMachine.sessionStore
@@ -54,11 +52,6 @@ struct NotchContentView: View {
         return expandedPanelHeight * 0.3 + notchSize.height
     }
 
-    private var shouldShowBackButton: Bool {
-        showingPanelSettings ||
-        (sessionStore.activeSessionCount >= 2 && showingSessionActivity)
-    }
-
     private var expandedPanelHeight: CGFloat {
         let fullHeight = NotchConstants.expandedPanelSize.height - notchSize.height - 24
         let collapsedHeight: CGFloat = 155
@@ -74,24 +67,9 @@ struct NotchContentView: View {
         .background {
             ZStack(alignment: .top) {
                 Color.black
-                GrassIslandView(sessions: sessionStore.sortedSessions, selectedSessionId: sessionStore.selectedSessionId, hoveredSessionId: hoveredSessionId)
+                GrassIslandView(state: sessionStore.unifiedState)
                     .frame(height: grassHeight, alignment: .bottom)
                     .opacity(isExpanded && !showingPanelSettings ? 1 : 0)
-            }
-        }
-        .overlay(alignment: .top) {
-            if isExpanded && !showingPanelSettings {
-                GrassTapOverlay(
-                    sessions: sessionStore.sortedSessions,
-                    selectedSessionId: sessionStore.selectedSessionId,
-                    hoveredSessionId: $hoveredSessionId,
-                    onSelectSession: { sessionId in
-                        guard sessionStore.activeSessionCount >= 2 else { return }
-                        sessionStore.selectSession(sessionId)
-                        showingSessionActivity = true
-                    }
-                )
-                .frame(height: grassHeight, alignment: .bottom)
             }
         }
         .overlay(alignment: .topTrailing) {
@@ -127,13 +105,6 @@ struct NotchContentView: View {
         .onChange(of: isExpanded) { _, expanded in
             if !expanded {
                 showingPanelSettings = false
-                showingSessionActivity = false
-                hoveredSessionId = nil
-            }
-        }
-        .onChange(of: sessionStore.activeSessionCount) { _, count in
-            if count < 2 {
-                showingSessionActivity = false
             }
         }
     }
@@ -149,7 +120,6 @@ struct NotchContentView: View {
                     ExpandedPanelView(
                         sessionStore: sessionStore,
                         showingSettings: $showingPanelSettings,
-                        showingSessionActivity: $showingSessionActivity,
                         isActivityCollapsed: $isActivityCollapsed
                     )
                     .frame(
@@ -171,7 +141,7 @@ struct NotchContentView: View {
 
             if isExpanded {
                 HStack {
-                    if shouldShowBackButton {
+                    if showingPanelSettings {
                         backButton
                             .padding(.leading, 15)
                     } else {
@@ -206,7 +176,7 @@ struct NotchContentView: View {
     }
 
     private var backButton: some View {
-        Button(action: goBack) {
+        Button(action: { showingPanelSettings = false }) {
             HStack(spacing: 5) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 11, weight: .semibold))
@@ -216,15 +186,6 @@ struct NotchContentView: View {
             .foregroundColor(.white.opacity(0.7))
         }
         .buttonStyle(.plain)
-    }
-
-    private func goBack() {
-        if showingPanelSettings {
-            showingPanelSettings = false
-        } else if showingSessionActivity {
-            showingSessionActivity = false
-            sessionStore.selectSession(nil)
-        }
     }
 
     @ViewBuilder
@@ -243,15 +204,10 @@ struct NotchContentView: View {
 
     @ViewBuilder
     private var headerSprites: some View {
-        let topSession = sessionStore.sortedSessions.first
         SessionSpriteView(
-            state: topSession?.state ?? .idle,
+            state: sessionStore.unifiedState,
             isSelected: true
         )
-    }
-
-    private func openSettings() {
-        showingPanelSettings = true
     }
 
     private func toggleMute() {

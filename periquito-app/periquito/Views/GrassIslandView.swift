@@ -2,26 +2,12 @@ import SwiftUI
 
 private enum SpriteLayout {
     static let size: CGFloat = 64
-    static let usableWidthFraction: CGFloat = 0.8
-    static let leftMarginFraction: CGFloat = 0.1
-
-    static func xOffset(xPosition: CGFloat, totalWidth: CGFloat) -> CGFloat {
-        let usableWidth = totalWidth * usableWidthFraction
-        let leftMargin = totalWidth * leftMarginFraction
-        return leftMargin + (xPosition * usableWidth) - (totalWidth / 2)
-    }
-
-    static func depthSorted(_ sessions: [SessionData]) -> [SessionData] {
-        sessions.sorted { $0.spriteYOffset < $1.spriteYOffset }
-    }
 }
 
 // MARK: - Visual layer (placed in .background, no interaction)
 
 struct GrassIslandView: View {
-    let sessions: [SessionData]
-    var selectedSessionId: String?
-    var hoveredSessionId: String?
+    let state: PeriquitoState
 
     private let patchWidth: CGFloat = 80
 
@@ -40,19 +26,7 @@ struct GrassIslandView: View {
                 .frame(width: geometry.size.width, alignment: .leading)
                 .drawingGroup()
 
-                if sessions.isEmpty {
-                    GrassSpriteView(state: .idle, xPosition: 0.5, yOffset: -15, totalWidth: geometry.size.width, glowOpacity: 0)
-                } else {
-                    ForEach(SpriteLayout.depthSorted(sessions)) { session in
-                        GrassSpriteView(
-                            state: session.state,
-                            xPosition: session.spriteXPosition,
-                            yOffset: session.spriteYOffset,
-                            totalWidth: geometry.size.width,
-                            glowOpacity: glowOpacity(for: session.id)
-                        )
-                    }
-                }
+                GrassSpriteView(state: state, totalWidth: geometry.size.width)
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .bottom)
         }
@@ -60,99 +34,19 @@ struct GrassIslandView: View {
         .allowsHitTesting(false)
     }
 
-    private func glowOpacity(for sessionId: String) -> Double {
-        if sessionId == selectedSessionId { return 0.7 }
-        if sessionId == hoveredSessionId { return 0.3 }
-        return 0
-    }
-
     private func patchCount(for width: CGFloat) -> Int {
         Int(ceil(width / patchWidth)) + 1
     }
 }
 
-// MARK: - Interaction layer (placed in .overlay for reliable hit testing)
-
-struct GrassTapOverlay: View {
-    let sessions: [SessionData]
-    var selectedSessionId: String?
-    @Binding var hoveredSessionId: String?
-    var onSelectSession: ((String) -> Void)?
-
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .bottom) {
-                Color.clear
-
-                if !sessions.isEmpty {
-                    ForEach(SpriteLayout.depthSorted(sessions)) { session in
-                        SpriteTapTarget(
-                            sessionId: session.id,
-                            xPosition: session.spriteXPosition,
-                            yOffset: session.spriteYOffset,
-                            totalWidth: geometry.size.width,
-                            hoveredSessionId: $hoveredSessionId,
-                            onTap: { onSelectSession?(session.id) }
-                        )
-                    }
-                }
-            }
-            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .bottom)
-        }
-    }
-}
-
-// MARK: - Private views
-
-private struct NoHighlightButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-    }
-}
-
-private struct SpriteTapTarget: View {
-    let sessionId: String
-    let xPosition: CGFloat
-    let yOffset: CGFloat
-    let totalWidth: CGFloat
-    @Binding var hoveredSessionId: String?
-    var onTap: (() -> Void)?
-
-    @State private var tapScale: CGFloat = 1.0
-
-    var body: some View {
-        Button(action: handleTap) {
-            Color.clear
-                .frame(width: SpriteLayout.size, height: SpriteLayout.size)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(NoHighlightButtonStyle())
-        .onHover { hovering in
-            hoveredSessionId = hovering ? sessionId : nil
-        }
-        .scaleEffect(tapScale)
-        .offset(x: SpriteLayout.xOffset(xPosition: xPosition, totalWidth: totalWidth), y: yOffset)
-    }
-
-    private func handleTap() {
-        withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) { tapScale = 1.15 }
-        Task {
-            try? await Task.sleep(for: .milliseconds(150))
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) { tapScale = 1.0 }
-        }
-        onTap?()
-    }
-}
+// MARK: - Single centered parrot
 
 private struct GrassSpriteView: View {
     let state: PeriquitoState
-    let xPosition: CGFloat
-    let yOffset: CGFloat
     let totalWidth: CGFloat
-    var glowOpacity: Double = 0
 
     @State private var walkOffset: CGFloat = 0
-    @State private var walkDirection: CGFloat = 1 // 1 = right, -1 = left
+    @State private var walkDirection: CGFloat = 1
     @State private var walkTimer: Task<Void, Never>?
 
     private let swayDuration: Double = 2.0
@@ -183,10 +77,8 @@ private struct GrassSpriteView: View {
 
     private static let sobTrembleAmplitude: CGFloat = 0.3
 
-    // Walking boundaries (points from center)
     private var walkRange: CGFloat {
-        let usableWidth = totalWidth * SpriteLayout.usableWidthFraction
-        return usableWidth * 0.35 // walk ~35% of usable area each direction
+        totalWidth * 0.25
     }
 
     var body: some View {
@@ -207,19 +99,10 @@ private struct GrassSpriteView: View {
                     .offset(x: 4, y: 4)
                     .scaleEffect(x: walkDirection >= 0 ? 1 : -1, y: 1, anchor: .center)
             }
-            .background(alignment: .bottom) {
-                if glowOpacity > 0 {
-                    Ellipse()
-                        .fill(glowColor.opacity(glowOpacity))
-                        .frame(width: SpriteLayout.size * 0.85, height: SpriteLayout.size * 0.25)
-                        .blur(radius: 8)
-                        .offset(y: 4)
-                }
-            }
             .rotationEffect(.degrees(swayDegrees(at: timeline.date)), anchor: .bottom)
             .offset(
-                x: SpriteLayout.xOffset(xPosition: xPosition, totalWidth: totalWidth) + walkOffset + trembleOffset(at: timeline.date, amplitude: state.emotion == .sob ? Self.sobTrembleAmplitude : 0),
-                y: yOffset + bobOffset(at: timeline.date, duration: bobDuration, amplitude: bobAmplitude)
+                x: walkOffset + trembleOffset(at: timeline.date, amplitude: state.emotion == .sob ? Self.sobTrembleAmplitude : 0),
+                y: -15 + bobOffset(at: timeline.date, duration: bobDuration, amplitude: bobAmplitude)
             )
         }
         .onAppear { startWalking() }
@@ -239,16 +122,12 @@ private struct GrassSpriteView: View {
 
         walkTimer = Task {
             while !Task.isCancelled {
-                // Random delay between walks
                 let range = state.walkFrequencyRange
                 let delay = Double.random(in: range)
                 try? await Task.sleep(for: .seconds(delay))
                 guard !Task.isCancelled, state.canWalk else { break }
 
-                // Pick a random target within walk range
                 let target = CGFloat.random(in: -walkRange...walkRange)
-
-                // Flip direction based on movement
                 let newDirection: CGFloat = target > walkOffset ? 1 : -1
 
                 await MainActor.run {

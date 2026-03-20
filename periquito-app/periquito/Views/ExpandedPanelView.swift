@@ -8,18 +8,13 @@ private enum PanelTab: String, CaseIterable {
 struct ExpandedPanelView: View {
     let sessionStore: SessionStore
     @Binding var showingSettings: Bool
-    @Binding var showingSessionActivity: Bool
     @Binding var isActivityCollapsed: Bool
     @State private var selectedTab: PanelTab = .tips
     @State private var historyStats: HistoryStats?
     var quizManager: SpacedRepetitionManager = .shared
 
-    private var effectiveSession: SessionData? {
-        sessionStore.effectiveSession
-    }
-
     private var state: PeriquitoState {
-        effectiveSession?.state ?? .idle
+        sessionStore.unifiedState
     }
 
     private var showIndicator: Bool {
@@ -27,24 +22,15 @@ struct ExpandedPanelView: View {
     }
 
     private var tips: [EnglishTip] {
-        effectiveSession?.englishTips ?? []
-    }
-
-    private var shouldShowSessionPicker: Bool {
-        sessionStore.activeSessionCount >= 2 && !showingSessionActivity
+        sessionStore.allTips
     }
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 if !showingSettings {
-                    if shouldShowSessionPicker {
-                        sessionPickerContent(geometry: geometry)
-                            .transition(.move(edge: .leading).combined(with: .opacity))
-                    } else {
-                        activityContent(geometry: geometry)
-                            .transition(.move(edge: .leading).combined(with: .opacity))
-                    }
+                    activityContent(geometry: geometry)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
                 }
 
                 PanelSettingsView()
@@ -54,44 +40,6 @@ struct ExpandedPanelView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: showingSettings)
-        .animation(.easeInOut(duration: 0.25), value: shouldShowSessionPicker)
-    }
-
-    @ViewBuilder
-    private func sessionPickerContent(geometry: GeometryProxy) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if isActivityCollapsed {
-                Spacer()
-                    .allowsHitTesting(false)
-            } else {
-                Spacer()
-                    .frame(height: geometry.size.height * 0.3)
-                    .allowsHitTesting(false)
-            }
-
-            VStack(alignment: .leading, spacing: 0) {
-                if !isActivityCollapsed {
-                    Divider().background(Color.white.opacity(0.08))
-
-                    SessionListView(
-                        sessions: sessionStore.sortedSessions,
-                        selectedSessionId: sessionStore.selectedSessionId,
-                        onSelectSession: { sessionId in
-                            sessionStore.selectSession(sessionId)
-                            showingSessionActivity = true
-                        },
-                        onDeleteSession: { sessionId in
-                            sessionStore.dismissSession(sessionId)
-                        }
-                    )
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-        }
-        .padding(.bottom, 5)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     @ViewBuilder
@@ -146,11 +94,11 @@ struct ExpandedPanelView: View {
     }
 
     private var isAnalyzing: Bool {
-        effectiveSession?.isAnalyzingEnglish ?? false
+        sessionStore.isAnyAnalyzing
     }
 
     private var currentEmotion: PeriquitoEmotion {
-        effectiveSession?.state.emotion ?? .neutral
+        sessionStore.currentEmotion
     }
 
     private var tabBar: some View {

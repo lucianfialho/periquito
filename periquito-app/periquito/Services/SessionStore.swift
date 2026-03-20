@@ -9,7 +9,6 @@ final class SessionStore {
     static let shared = SessionStore()
 
     private(set) var sessions: [String: SessionData] = [:]
-    private(set) var selectedSessionId: String?
     private var nextSessionNumberByProject: [String: Int] = [:]
 
     private init() {}
@@ -27,27 +26,34 @@ final class SessionStore {
         sessions.count
     }
 
-    var selectedSession: SessionData? {
-        guard let id = selectedSessionId else { return nil }
-        return sessions[id]
-    }
-
+    /// The most active session (processing first, then most recent)
     var effectiveSession: SessionData? {
-        if let selected = selectedSession {
-            return selected
-        }
         if sessions.count == 1 {
             return sessions.values.first
         }
         return sortedSessions.first
     }
 
-    func selectSession(_ sessionId: String?) {
-        if let id = sessionId {
-            guard sessions[id] != nil else { return }
-        }
-        selectedSessionId = sessionId
-        logger.info("Selected session: \(sessionId ?? "nil", privacy: .public)")
+    /// Unified parrot state from the most active session
+    var unifiedState: PeriquitoState {
+        effectiveSession?.state ?? .idle
+    }
+
+    /// Aggregated tips from ALL sessions, sorted by timestamp
+    var allTips: [EnglishTip] {
+        sessions.values
+            .flatMap(\.englishTips)
+            .sorted { $0.timestamp < $1.timestamp }
+    }
+
+    /// True if any session is currently analyzing English
+    var isAnyAnalyzing: Bool {
+        sessions.values.contains { $0.isAnalyzingEnglish }
+    }
+
+    /// Current emotion from the effective session
+    var currentEmotion: PeriquitoEmotion {
+        effectiveSession?.state.emotion ?? .neutral
     }
 
     func process(_ event: HookEvent) -> SessionData {
@@ -133,31 +139,15 @@ final class SessionStore {
         let projectName = (cwd as NSString).lastPathComponent
         let sessionNumber = nextSessionNumberByProject[projectName, default: 0] + 1
         nextSessionNumberByProject[projectName] = sessionNumber
-        let existingXPositions = sessions.values.map(\.spriteXPosition)
-        let session = SessionData(sessionId: sessionId, cwd: cwd, sessionNumber: sessionNumber, isInteractive: isInteractive, existingXPositions: existingXPositions)
+        let session = SessionData(sessionId: sessionId, cwd: cwd, sessionNumber: sessionNumber, isInteractive: isInteractive)
         sessions[sessionId] = session
         logger.info("Created session #\(sessionNumber): \(sessionId, privacy: .public) at \(cwd, privacy: .public)")
-
-        if activeSessionCount == 1 {
-            selectedSessionId = sessionId
-        } else {
-            selectedSessionId = nil
-        }
-
         return session
     }
 
     private func removeSession(_ sessionId: String) {
         sessions.removeValue(forKey: sessionId)
         logger.info("Removed session: \(sessionId, privacy: .public)")
-
-        if selectedSessionId == sessionId {
-            selectedSessionId = nil
-        }
-
-        if activeSessionCount == 1 {
-            selectedSessionId = sessions.keys.first
-        }
     }
 
     func dismissSession(_ sessionId: String) {
