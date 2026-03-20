@@ -7,6 +7,7 @@ struct PanelSettingsView: View {
     @State private var hooksError = false
     @ObservedObject private var updateManager = UpdateManager.shared
     @State private var claudeAvailable = false
+    @State private var currentFontSize = AppSettings.fontSize
 
     private var hookStatusText: String {
         if hooksError { return "Error" }
@@ -47,7 +48,7 @@ struct PanelSettingsView: View {
 
             SoundPickerView()
 
-            FontSizePickerRow()
+            FontSizePickerRow(selected: $currentFontSize)
         }
     }
 
@@ -112,20 +113,7 @@ struct PanelSettingsView: View {
                 }
             }
             .buttonStyle(.plain)
-
-            Button(action: openGitHubRepo) {
-                SettingsRowView(icon: "star", title: "Star on GitHub") {
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 10))
-                        .foregroundColor(TerminalColors.dimmedText)
-                }
-            }
-            .buttonStyle(.plain)
         }
-    }
-
-    private func openGitHubRepo() {
-        NSWorkspace.shared.open(URL(string: "https://github.com/lucianfialho/periquito")!)
     }
 
     private var quitSection: some View {
@@ -133,7 +121,7 @@ struct PanelSettingsView: View {
             NSApplication.shared.terminate(nil)
         }) {
             Text("Quit Periquito")
-                .font(.system(size: 11))
+                .font(.system(size: currentFontSize.settingsFont - 1))
                 .foregroundColor(TerminalColors.dimmedText)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 8)
@@ -173,7 +161,7 @@ struct PanelSettingsView: View {
 
     private func statusBadge(_ text: String, color: Color) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .medium))
+            .font(.system(size: currentFontSize.settingsFont - 2, weight: .medium))
             .foregroundColor(color)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
@@ -239,16 +227,17 @@ struct SettingsRowView<Trailing: View>: View {
     let icon: String
     let title: String
     @ViewBuilder let trailing: () -> Trailing
+    private var fs: CGFloat { AppSettings.fontSize.settingsFont }
 
     var body: some View {
         HStack {
             Image(systemName: icon)
-                .font(.system(size: 12))
+                .font(.system(size: fs))
                 .foregroundColor(TerminalColors.secondaryText)
                 .frame(width: 20)
 
             Text(title)
-                .font(.system(size: 12))
+                .font(.system(size: fs))
                 .foregroundColor(TerminalColors.primaryText)
 
             Spacer()
@@ -279,15 +268,17 @@ struct ToggleSwitch: View {
 }
 
 struct FontSizePickerRow: View {
-    @State private var selected = AppSettings.fontSize
+    @Binding var selected: AppSettings.FontSize
 
     var body: some View {
         SettingsRowView(icon: "textformat.size", title: "Font Size") {
             HStack(spacing: 4) {
                 ForEach(AppSettings.FontSize.allCases, id: \.rawValue) { size in
                     Button(action: {
-                        selected = size
-                        AppSettings.fontSize = size
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            selected = size
+                            AppSettings.fontSize = size
+                        }
                     }) {
                         Text(size.label)
                             .font(.system(size: 11, weight: selected == size ? .bold : .regular))

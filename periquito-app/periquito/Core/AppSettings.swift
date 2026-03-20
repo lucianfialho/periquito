@@ -54,16 +54,24 @@ struct AppSettings {
         var tipFont: CGFloat {
             switch self {
             case .small: return 10
-            case .regular: return 11
-            case .large: return 13
+            case .regular: return 12
+            case .large: return 15
             }
         }
 
         var promptFont: CGFloat {
             switch self {
             case .small: return 9
-            case .regular: return 10
-            case .large: return 12
+            case .regular: return 11
+            case .large: return 13
+            }
+        }
+
+        var settingsFont: CGFloat {
+            switch self {
+            case .small: return 11
+            case .regular: return 12
+            case .large: return 14
             }
         }
 
