@@ -97,9 +97,9 @@ final class EmotionAnalyzer {
         process.executableURL = URL(fileURLWithPath: claudePath)
         process.arguments = [
             "-p", analysisPrompt,
-            "--output-format", "text",
-            "--max-turns", "1",
-            "--settings", "{}"
+            "--output-format", "stream-json",
+            "--verbose",
+            "--max-turns", "1"
         ]
 
         // Set environment to avoid recursive hooks
@@ -111,11 +111,30 @@ final class EmotionAnalyzer {
         let stderr = Pipe()
         process.standardOutput = stdout
         process.standardError = stderr
+        process.standardInput = FileHandle.nullDevice
 
         return try await withCheckedThrowingContinuation { continuation in
             process.terminationHandler = { _ in
                 let data = stdout.fileHandleForReading.readDataToEndOfFile()
-                let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let rawOutput = String(data: data, encoding: .utf8) ?? ""
+
+                // Parse stream-json: extract text from assistant events
+                var textParts: [String] = []
+                for line in rawOutput.components(separatedBy: "\n") {
+                    let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty,
+                          let lineData = trimmed.data(using: .utf8),
+                          let obj = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                          obj["type"] as? String == "assistant",
+                          let message = obj["message"] as? [String: Any],
+                          let content = message["content"] as? [[String: Any]] else { continue }
+                    for block in content {
+                        if block["type"] as? String == "text", let text = block["text"] as? String {
+                            textParts.append(text)
+                        }
+                    }
+                }
+                let output = textParts.joined().trimmingCharacters(in: .whitespacesAndNewlines)
 
                 let jsonString = EmotionAnalyzer.extractJSON(from: output)
 
