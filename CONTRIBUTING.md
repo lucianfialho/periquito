@@ -6,7 +6,7 @@ Thanks for your interest in contributing! This document covers how to report bug
 
 ### I found a bug
 
-Search [existing issues](https://github.com/sk-ruban/periquito/issues) first. If it hasn't been reported, open an issue with steps to reproduce, your macOS version, and any relevant logs.
+Search [existing issues](https://github.com/lucianfialho/periquito/issues) first. If it hasn't been reported, open an issue with steps to reproduce, your macOS version, and any relevant logs.
 
 ### I have an idea for a feature
 
@@ -23,7 +23,7 @@ Pull requests without a corresponding issue may be closed or sit indefinitely.
 ## Local Development
 
 1. Clone the repo
-2. Open `periquito/periquito.xcodeproj` in Xcode
+2. Open `periquito-app/periquito.xcodeproj` in Xcode
 3. Build and run (`⌘R`)
 
 The app auto-installs Claude Code hooks on launch, so just start a Claude Code session to see it in action.

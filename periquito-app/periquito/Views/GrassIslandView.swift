@@ -127,7 +127,7 @@ private struct GrassSpriteView: View {
             }
             .offset(
                 x: walkOffset + trembleOffset(at: timeline.date, amplitude: state.emotion == .sob ? Self.sobTrembleAmplitude : 0),
-                y: -4 + bobOffset(at: timeline.date, duration: bobDuration, amplitude: bobAmplitude)
+                y: 8 + bobOffset(at: timeline.date, duration: bobDuration, amplitude: bobAmplitude)
             )
         }
         .onAppear { startWalking() }

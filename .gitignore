@@ -37,10 +37,13 @@ Package.resolved
 .env
 .sparkle-keys/
 
-# Claude
+# Claude / internal planning
 AGENTS.md
 PLAN.md
 FUTURE_WORK.md
+prp.json
+tasks/
+docs/superpowers/
 
 # Distribution
 *.dmg
