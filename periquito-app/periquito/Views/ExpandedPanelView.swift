@@ -220,6 +220,8 @@ struct ExpandedPanelView: View {
 
                         QuizBubbleView(
                             quizState: quizManager.quizState,
+                            options: quizManager.currentOptions,
+                            correctAnswer: quizManager.currentQuiz?.correctSentence ?? "",
                             onSubmit: { answer in
                                 quizManager.submitAnswer(answer)
                             },

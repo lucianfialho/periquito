@@ -2,6 +2,8 @@ import SwiftUI
 
 struct QuizBubbleView: View {
     let quizState: QuizState
+    let options: [String]
+    let correctAnswer: String
     let onSubmit: (String) -> Void
     let onDismiss: () -> Void
 
@@ -20,6 +22,9 @@ struct QuizBubbleView: View {
             case .idle:
                 EmptyView()
             }
+        }
+        .onChange(of: quizState) { _, _ in
+            selectedAnswer = nil
         }
     }
 
@@ -43,24 +48,24 @@ struct QuizBubbleView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                // Multiple choice buttons — wrong vs correct (shuffled)
-                let options = Self.shuffledOptions(item: item)
                 VStack(spacing: 6) {
                     ForEach(options, id: \.self) { option in
                         Button(action: {
+                            guard selectedAnswer == nil else { return }
                             selectedAnswer = option
                             onSubmit(option)
                         }) {
                             Text(option)
                                 .font(.system(size: fontSize.tipFont, weight: .medium))
-                                .foregroundColor(TerminalColors.primaryText)
+                                .foregroundColor(optionTextColor(for: option))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 8)
-                                .background(Color.white.opacity(0.08))
+                                .background(optionBackground(for: option))
                                 .cornerRadius(8)
                         }
                         .buttonStyle(.plain)
+                        .disabled(selectedAnswer != nil)
                     }
                 }
 
@@ -81,11 +86,26 @@ struct QuizBubbleView: View {
         }
     }
 
-    private static func shuffledOptions(item: QuizItem) -> [String] {
-        // Take just the core part (before any " / " alternatives)
-        let correct = item.correctSentence.components(separatedBy: " / ").first ?? item.correctSentence
-        let wrong = item.incorrectSentence
-        return [correct, wrong].shuffled()
+    private func optionBackground(for option: String) -> Color {
+        guard let selected = selectedAnswer else {
+            return Color.white.opacity(0.08)
+        }
+        if option == selected {
+            return selected == correctAnswer
+                ? TerminalColors.green.opacity(0.2)
+                : TerminalColors.amber.opacity(0.2)
+        }
+        return Color.white.opacity(0.04)
+    }
+
+    private func optionTextColor(for option: String) -> Color {
+        guard let selected = selectedAnswer else {
+            return TerminalColors.primaryText
+        }
+        if option == selected {
+            return selected == correctAnswer ? TerminalColors.green : TerminalColors.amber
+        }
+        return TerminalColors.dimmedText
     }
 
     // MARK: - Loading
