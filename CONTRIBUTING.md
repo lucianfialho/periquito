@@ -6,7 +6,7 @@ Thanks for your interest in contributing! This document covers how to report bug
 
 ### I found a bug
 
-Search [existing issues](https://github.com/lucianfialho/periquito/issues) first. If it hasn't been reported, open an issue with steps to reproduce, your macOS version, and any relevant logs.
+Search [existing issues](https://github.com/lucianfialho/periquito/issues) first. This project is forked from [sk-ruban/notchi](https://github.com/sk-ruban/notchi). If it hasn't been reported, open an issue with steps to reproduce, your macOS version, and any relevant logs.
 
 ### I have an idea for a feature
 

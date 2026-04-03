@@ -70,7 +70,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits
 
-- Forked from [sk-ruban/periquito](https://github.com/sk-ruban/periquito) (MIT) — original notch companion
+- Forked from [sk-ruban/notchi](https://github.com/sk-ruban/notchi) (MIT) — original macOS notch companion
 - Sprite art generated with [AutoSprite](https://autosprite.co)
 
 ## License
