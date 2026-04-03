@@ -7,7 +7,8 @@ enum PeriquitoTask: String, CaseIterable {
         switch self {
         case .compacting: return 6.0
         case .sleeping: return 2.0
-        case .idle, .waiting: return 3.0
+        case .idle: return 3.0
+        case .waiting: return 3.0
         case .working: return 4.0
         }
     }
@@ -60,19 +61,6 @@ enum PeriquitoTask: String, CaseIterable {
         }
     }
 
-    var frameCount: Int {
-        switch self {
-        case .compacting: return 5
-        default: return 6
-        }
-    }
-
-    var columns: Int {
-        switch self {
-        case .compacting: return 5
-        default: return 6
-        }
-    }
 }
 
 enum PeriquitoEmotion: String, CaseIterable {
@@ -102,7 +90,40 @@ struct PeriquitoState: Equatable {
         }
         return "\(task.spritePrefix)_neutral"
     }
-    var animationFPS: Double { task.animationFPS }
+    /// Animation parameters vary per sprite (task + emotion combination)
+    var animationFPS: Double {
+        switch (task, emotion) {
+        case (.idle, .happy):                     return 10.0
+        case (.idle, .sad):                       return 6.0
+        case (.idle, .sob):                       return 4.0
+        case (.working, .happy):                  return 12.0
+        case (.working, .sad):                    return 8.0
+        case (.working, .sob):                    return 6.0
+        case (.waiting, .happy):                  return 10.0
+        case (.waiting, .sad):                    return 6.0
+        case (.waiting, .sob):                    return 5.0
+        case (.compacting, _):                    return 14.0
+        case (.sleeping, _):                      return 6.0
+        case (.idle, .neutral):                   return 8.0
+        case (.working, .neutral):                return 10.0
+        case (.waiting, .neutral):                return 8.0
+        }
+    }
+
+    var frameCount: Int {
+        // walk, mad, sleep sprites have 16 frames; blink, talk, jump, kiss have 8
+        switch (task, emotion) {
+        case (.idle, .happy):                     return 16  // walk
+        case (.idle, .sad), (.idle, .sob):        return 16  // mad
+        case (.working, .sad), (.working, .sob):  return 16  // mad
+        case (.waiting, .sob):                    return 16  // mad
+        case (.sleeping, _):                      return 16  // sleep
+        default:                                  return 8   // blink, talk, jump
+        }
+    }
+
+    var columns: Int { 4 }  // All new sprites use 4 columns
+
     var bobDuration: Double { task.bobDuration }
     var bobAmplitude: CGFloat {
         switch emotion {
@@ -115,8 +136,6 @@ struct PeriquitoState: Equatable {
     var canWalk: Bool { emotion == .sob ? false : task.canWalk }
     var displayName: String { task.displayName }
     var walkFrequencyRange: ClosedRange<Double> { task.walkFrequencyRange }
-    var frameCount: Int { task.frameCount }
-    var columns: Int { task.columns }
 
     static let idle = PeriquitoState(task: .idle)
     static let working = PeriquitoState(task: .working)
