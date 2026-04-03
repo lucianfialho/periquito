@@ -4,6 +4,8 @@ A macOS notch companion that helps you learn English while you code with Claude 
 
 A Tamagotchi-style parrot that lives in your MacBook notch, analyzes your English in real-time, and teaches you through spaced repetition — without breaking your flow.
 
+https://github.com/lucianfialho/periquito/releases/download/v1.1.0/export-kk.mp4
+
 ## What it does
 
 - **Analyzes your English** in every Claude Code prompt via AI
