@@ -11,6 +11,8 @@ struct ExpandedPanelView: View {
     @Binding var isActivityCollapsed: Bool
     @State private var selectedTab: PanelTab = .tips
     @State private var historyStats: HistoryStats?
+    @State private var accuracyDelta: Int = 0
+    @State private var showDelta: Bool = false
     var quizManager: SpacedRepetitionManager = .shared
 
     private var state: PeriquitoState {
@@ -55,32 +57,30 @@ struct ExpandedPanelView: View {
             }
 
             VStack(alignment: .leading, spacing: 0) {
-                if !isActivityCollapsed {
+                if isActivityCollapsed {
+                    collapsedStatsRow
+                } else {
                     Divider().background(Color.white.opacity(0.08))
                     tabBar
-                }
 
-                if selectedTab == .tips {
-                    if quizManager.quizState != .idle {
-                        quizSection
-                    } else if !tips.isEmpty {
-                        tipsSection
-                    } else if !isActivityCollapsed {
-                        Spacer()
-                        emptyState
-                    }
-                } else {
-                    if !isActivityCollapsed {
+                    if selectedTab == .tips {
+                        if quizManager.quizState != .idle {
+                            quizSection
+                        } else if !tips.isEmpty {
+                            tipsSection
+                        } else {
+                            Spacer()
+                            emptyState
+                        }
+                    } else {
                         StatsView(stats: historyStats, levelManager: LevelManager.shared)
                     }
-                }
 
-                if !isActivityCollapsed {
                     Spacer()
-                }
 
-                if showIndicator && !isActivityCollapsed {
-                    WorkingIndicatorView(state: state)
+                    if showIndicator {
+                        WorkingIndicatorView(state: state)
+                    }
                 }
             }
             .padding(.horizontal, 12)
@@ -129,7 +129,83 @@ struct ExpandedPanelView: View {
     }
 
     private func loadStats() async {
+        let old = historyStats?.accuracy ?? 0
         historyStats = await HistoryStatsLoader.load()
+        let new = historyStats?.accuracy ?? 0
+        let delta = new - old
+        if delta != 0 && old != 0 {
+            await MainActor.run {
+                accuracyDelta = delta
+                showDelta = true
+            }
+            try? await Task.sleep(for: .seconds(2.5))
+            await MainActor.run { showDelta = false }
+        }
+    }
+
+    private var collapsedAccuracyColor: Color {
+        guard let acc = historyStats?.accuracy else { return TerminalColors.dimmedText }
+        if acc >= 80 { return TerminalColors.green }
+        if acc >= 50 { return TerminalColors.amber }
+        return Color(red: 0.95, green: 0.4, blue: 0.35)
+    }
+
+    private var collapsedStatsRow: some View {
+        HStack(spacing: 10) {
+            // Accuracy
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(historyStats.flatMap { $0.accuracy.map { "\($0)" } } ?? "--")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundColor(collapsedAccuracyColor)
+                Text("%")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(collapsedAccuracyColor.opacity(0.7))
+            }
+
+            // Delta arrow
+            if showDelta {
+                HStack(spacing: 2) {
+                    Image(systemName: accuracyDelta > 0 ? "arrow.up" : "arrow.down")
+                        .font(.system(size: 9, weight: .bold))
+                    Text("\(abs(accuracyDelta))%")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                .foregroundColor(accuracyDelta > 0 ? TerminalColors.green : TerminalColors.amber)
+                .transition(.scale(scale: 0.7).combined(with: .opacity))
+            }
+
+            // Good / Corrections
+            if let stats = historyStats, stats.totalEvaluated > 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: "hand.thumbsup.fill")
+                        .font(.system(size: 9))
+                        .foregroundColor(TerminalColors.green.opacity(0.8))
+                    Text("\(stats.totalGood)")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundColor(TerminalColors.green)
+                }
+
+                HStack(spacing: 4) {
+                    Image(systemName: "hand.thumbsdown.fill")
+                        .font(.system(size: 9))
+                        .foregroundColor(TerminalColors.amber.opacity(0.8))
+                    Text("\(stats.totalCorrections)")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundColor(TerminalColors.amber)
+                }
+            }
+
+            Spacer()
+
+            // Level badge
+            let level = LevelManager.shared.level
+            Text("\(level.emoji) \(level.name)")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(TerminalColors.dimmedText)
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 5)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showDelta)
     }
 
     private var quizSection: some View {
