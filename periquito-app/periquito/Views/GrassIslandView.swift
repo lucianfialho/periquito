@@ -116,13 +116,6 @@ private struct GrassSpriteView: View {
                 )
                 .frame(width: SpriteLayout.size, height: SpriteLayout.size)
                 .scaleEffect(x: spriteScaleX, y: 1, anchor: .center)
-                .overlay(alignment: .bottomTrailing) {
-                    Text(LevelManager.shared.level.emoji)
-                        .font(.system(size: 12))
-                        .shadow(color: .black, radius: 1, x: 0, y: 0.5)
-                        .offset(x: 4, y: 4)
-                        .scaleEffect(x: spriteScaleX, y: 1, anchor: .center)
-                }
                 .rotationEffect(.degrees(swayDegrees(at: timeline.date)), anchor: .bottom)
 
                 // Shadow ellipse
