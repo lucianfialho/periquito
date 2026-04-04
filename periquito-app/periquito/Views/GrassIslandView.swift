@@ -9,6 +9,7 @@ private enum SpriteLayout {
 struct GrassIslandView: View {
     let state: PeriquitoState
 
+    @ObservedObject private var sponsorService = SponsorService.shared
     private let patchWidth: CGFloat = 80
 
     var body: some View {
@@ -27,6 +28,11 @@ struct GrassIslandView: View {
                 .drawingGroup()
 
                 GrassSpriteView(state: state, totalWidth: geometry.size.width)
+
+                // Sponsor signs in the grass
+                if !sponsorService.sponsors.isEmpty {
+                    SponsorSignsView(sponsors: sponsorService.sponsors, totalWidth: geometry.size.width)
+                }
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .bottom)
         }
@@ -178,6 +184,53 @@ private struct GrassSpriteView: View {
                     isWalking = false
                 }
             }
+        }
+    }
+}
+
+// MARK: - Sponsor signs
+
+private struct SponsorSignsView: View {
+    let sponsors: [Sponsor]
+    let totalWidth: CGFloat
+
+    /// Show at most 3 sponsors, evenly spread across the grass
+    private var visibleSponsors: [Sponsor] { Array(sponsors.prefix(3)) }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(visibleSponsors.enumerated()), id: \.element.id) { index, sponsor in
+                Spacer()
+                SponsorSignView(sponsor: sponsor)
+                if index == visibleSponsors.count - 1 { Spacer() }
+            }
+        }
+        .frame(width: totalWidth)
+        .offset(y: -2)
+    }
+}
+
+private struct SponsorSignView: View {
+    let sponsor: Sponsor
+
+    var body: some View {
+        Text("♥ \(sponsor.name)")
+            .font(.system(size: 7, weight: .semibold))
+            .foregroundColor(.white.opacity(0.75))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(
+                Capsule()
+                    .fill(tierColor.opacity(0.55))
+                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5))
+            )
+    }
+
+    private var tierColor: Color {
+        switch sponsor.tier {
+        case "gold":    return Color(red: 0.85, green: 0.65, blue: 0.1)
+        case "silver":  return Color(red: 0.6, green: 0.6, blue: 0.65)
+        default:        return Color(red: 0.3, green: 0.55, blue: 0.35)
         }
     }
 }

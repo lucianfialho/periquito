@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observeScreenChanges()
         startHookServices()
         startUsageService()
+        Task { await SponsorService.shared.load() }
         if updaterStarted {
             updater.checkForUpdates()
         }
