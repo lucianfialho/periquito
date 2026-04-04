@@ -64,6 +64,14 @@ periquito-app/          Swift/SwiftUI macOS app
 scripts/                Shell scripts for hooks and CLI tools
 ```
 
+## Sponsors
+
+These sponsors appear in the parrot's scene. [Become a sponsor](https://github.com/sponsors/lucianfialho) to show your logo in the grass.
+
+| Tier | Sponsor |
+|------|---------|
+| 🥇 Gold | [metricasboss](https://github.com/metricasboss) |
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
