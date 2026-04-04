@@ -7,16 +7,45 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		31641FC850A80EBFC3B96767 /* HistoryStatsLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24DCE174F82BD77A93D312BF /* HistoryStatsLoaderTests.swift */; };
+		45D41159AD9302AAC793A0DF /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DD3259B4F6752413AC180B9 /* TestSupport.swift */; };
 		47C923A02F2CFA1F00EA1E18 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 47C923A12F2CFA1F00EA1E18 /* Sparkle */; };
+		64BC2B9E5EE414A6413EF120 /* SessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24ED6FBF85341FFE26B70897 /* SessionStoreTests.swift */; };
+		78089E55C111F8EA1189D776 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A16AFFD9F1FDEFC875DBBB8E /* Cocoa.framework */; };
+		9171009E7517D41B947EA8B0 /* AppSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58F6699E40496904CDAAD52D /* AppSettingsTests.swift */; };
+		C6A35281F7369BA25512DFB1 /* ScreenIdentifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02E25C265ECCE01513EF84F /* ScreenIdentifierTests.swift */; };
+		D89D639ADF1D6E3593F695B5 /* DistractorEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6213B0B87B9965CAA4E9784 /* DistractorEngineTests.swift */; };
+		E5400907D0BB73788BD5163A /* ParrotLevelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14AA06EF318E95F76FDBB0A /* ParrotLevelTests.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		297C38BDA479DC8EC3CC3BCF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 47C9227A2F2CFA1F00EA1E18 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 47C922812F2CFA1F00EA1E18;
+			remoteInfo = periquito;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		24DCE174F82BD77A93D312BF /* HistoryStatsLoaderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HistoryStatsLoaderTests.swift; sourceTree = "<group>"; };
+		24ED6FBF85341FFE26B70897 /* SessionStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionStoreTests.swift; sourceTree = "<group>"; };
 		47C922822F2CFA1F00EA1E18 /* periquito.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = periquito.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		58F6699E40496904CDAAD52D /* AppSettingsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppSettingsTests.swift; sourceTree = "<group>"; };
+		6DD3259B4F6752413AC180B9 /* TestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
+		A16AFFD9F1FDEFC875DBBB8E /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		B02E25C265ECCE01513EF84F /* ScreenIdentifierTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenIdentifierTests.swift; sourceTree = "<group>"; };
+		C6213B0B87B9965CAA4E9784 /* DistractorEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DistractorEngineTests.swift; sourceTree = "<group>"; };
+		D14AA06EF318E95F76FDBB0A /* ParrotLevelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ParrotLevelTests.swift; sourceTree = "<group>"; };
+		F808507EF0BF41B5B4AD3027 /* periquitoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = periquitoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		47C922842F2CFA1F00EA1E18 /* periquito */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = periquito;
 			sourceTree = "<group>";
 		};
@@ -31,6 +60,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		68233D4C9B66A87E74924CE4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				78089E55C111F8EA1189D776 /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -39,6 +76,8 @@
 			children = (
 				47C922842F2CFA1F00EA1E18 /* periquito */,
 				47C922832F2CFA1F00EA1E18 /* Products */,
+				7ADE716B0BC9A3713A979425 /* Frameworks */,
+				5CBC6771C12F1BAE2D6A84AC /* periquitoTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -46,8 +85,40 @@
 			isa = PBXGroup;
 			children = (
 				47C922822F2CFA1F00EA1E18 /* periquito.app */,
+				F808507EF0BF41B5B4AD3027 /* periquitoTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		5CBC6771C12F1BAE2D6A84AC /* periquitoTests */ = {
+			isa = PBXGroup;
+			children = (
+				58F6699E40496904CDAAD52D /* AppSettingsTests.swift */,
+				C6213B0B87B9965CAA4E9784 /* DistractorEngineTests.swift */,
+				24DCE174F82BD77A93D312BF /* HistoryStatsLoaderTests.swift */,
+				D14AA06EF318E95F76FDBB0A /* ParrotLevelTests.swift */,
+				B02E25C265ECCE01513EF84F /* ScreenIdentifierTests.swift */,
+				24ED6FBF85341FFE26B70897 /* SessionStoreTests.swift */,
+				6DD3259B4F6752413AC180B9 /* TestSupport.swift */,
+			);
+			name = periquitoTests;
+			path = periquitoTests;
+			sourceTree = "<group>";
+		};
+		7013CEF4516AFDAA10051074 /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				A16AFFD9F1FDEFC875DBBB8E /* Cocoa.framework */,
+			);
+			name = "OS X";
+			sourceTree = "<group>";
+		};
+		7ADE716B0BC9A3713A979425 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				7013CEF4516AFDAA10051074 /* OS X */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -76,6 +147,24 @@
 			productReference = 47C922822F2CFA1F00EA1E18 /* periquito.app */;
 			productType = "com.apple.product-type.application";
 		};
+		73F498D2B529DFA4DB8BA4C4 /* periquitoTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AC95E15F4C2357E15902E0DF /* Build configuration list for PBXNativeTarget "periquitoTests" */;
+			buildPhases = (
+				A0B3328010A69B40CA5F7D84 /* Sources */,
+				68233D4C9B66A87E74924CE4 /* Frameworks */,
+				4EF0038BC3677EF403F12E41 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A92234A8E79ABD9187623D35 /* PBXTargetDependency */,
+			);
+			name = periquitoTests;
+			productName = periquitoTests;
+			productReference = F808507EF0BF41B5B4AD3027 /* periquitoTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -88,6 +177,10 @@
 				TargetAttributes = {
 					47C922812F2CFA1F00EA1E18 = {
 						CreatedOnToolsVersion = 26.0;
+					};
+					73F498D2B529DFA4DB8BA4C4 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = 47C922812F2CFA1F00EA1E18;
 					};
 				};
 			};
@@ -109,12 +202,20 @@
 			projectRoot = "";
 			targets = (
 				47C922812F2CFA1F00EA1E18 /* periquito */,
+				73F498D2B529DFA4DB8BA4C4 /* periquitoTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		47C922802F2CFA1F00EA1E18 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4EF0038BC3677EF403F12E41 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -131,9 +232,50 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A0B3328010A69B40CA5F7D84 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9171009E7517D41B947EA8B0 /* AppSettingsTests.swift in Sources */,
+				D89D639ADF1D6E3593F695B5 /* DistractorEngineTests.swift in Sources */,
+				31641FC850A80EBFC3B96767 /* HistoryStatsLoaderTests.swift in Sources */,
+				E5400907D0BB73788BD5163A /* ParrotLevelTests.swift in Sources */,
+				C6A35281F7369BA25512DFB1 /* ScreenIdentifierTests.swift in Sources */,
+				64BC2B9E5EE414A6413EF120 /* SessionStoreTests.swift in Sources */,
+				45D41159AD9302AAC793A0DF /* TestSupport.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		A92234A8E79ABD9187623D35 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = periquito;
+			target = 47C922812F2CFA1F00EA1E18 /* periquito */;
+			targetProxy = 297C38BDA479DC8EC3CC3BCF /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		3B55644042551F4EC341203B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lucianfialho.periquitoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/periquito.app/Contents/MacOS/periquito";
+				TEST_TARGET_NAME = periquito;
+			};
+			name = Debug;
+		};
 		47C9228B2F2CFA2000EA1E18 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -332,6 +474,24 @@
 			};
 			name = Release;
 		};
+		6A65937EF2D81111D89D4140 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lucianfialho.periquitoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/periquito.app/Contents/MacOS/periquito";
+				TEST_TARGET_NAME = periquito;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -349,6 +509,15 @@
 			buildConfigurations = (
 				47C9228E2F2CFA2000EA1E18 /* Debug */,
 				47C9228F2F2CFA2000EA1E18 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AC95E15F4C2357E15902E0DF /* Build configuration list for PBXNativeTarget "periquitoTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6A65937EF2D81111D89D4140 /* Release */,
+				3B55644042551F4EC341203B /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

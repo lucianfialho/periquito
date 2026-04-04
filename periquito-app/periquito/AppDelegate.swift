@@ -3,15 +3,17 @@ import Sparkle
 import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var notchPanel: NotchPanel?
-    private let windowHeight: CGFloat = 500
-
     private let updater: SPUUpdater
     private let userDriver: NotchUserDriver
+    private let windowController: NotchWindowController
+    private let isRunningTests: Bool
+    private var bootstrapper: AppBootstrapper?
     private var updaterStarted = false
 
     override init() {
+        isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
         userDriver = NotchUserDriver()
+        windowController = NotchWindowController()
         updater = SPUUpdater(
             hostBundle: Bundle.main,
             applicationBundle: Bundle.main,
@@ -22,6 +24,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         UpdateManager.shared.setUpdater(updater)
 
+        guard !isRunningTests else {
+            return
+        }
+
         do {
             try updater.start()
             updaterStarted = true
@@ -31,56 +37,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApplication.shared.setActivationPolicy(.accessory)
-        setupNotchWindow()
-        observeScreenChanges()
-        startHookServices()
-        startUsageService()
-        Task { await SponsorService.shared.load() }
-        if updaterStarted {
-            updater.checkForUpdates()
+        guard !isRunningTests else {
+            return
         }
-    }
 
-    private func startHookServices() {
-        HookInstaller.installIfNeeded()
-        LevelManager.shared.applyDecay()
-        SocketServer.shared.start { event in
-            Task { @MainActor in
-                PeriquitoStateMachine.shared.handleEvent(event)
-            }
-        }
+        bootstrapper = AppBootstrapper(updater: updater)
+        windowController.setupWindow()
+        observeScreenChanges()
+        bootstrapper?.launch(checkForUpdates: updaterStarted)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
-    }
-
-    @MainActor private func setupNotchWindow() {
-        ScreenSelector.shared.refreshScreens()
-        guard let screen = ScreenSelector.shared.selectedScreen else { return }
-        NotchPanelManager.shared.updateGeometry(for: screen)
-
-        let panel = NotchPanel(frame: windowFrame(for: screen))
-
-        let contentView = NotchContentView()
-        let hostingView = NSHostingView(rootView: contentView)
-
-        let hitTestView = NotchHitTestView()
-        hitTestView.panelManager = NotchPanelManager.shared
-        hitTestView.addSubview(hostingView)
-        hostingView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            hostingView.topAnchor.constraint(equalTo: hitTestView.topAnchor),
-            hostingView.bottomAnchor.constraint(equalTo: hitTestView.bottomAnchor),
-            hostingView.leadingAnchor.constraint(equalTo: hitTestView.leadingAnchor),
-            hostingView.trailingAnchor.constraint(equalTo: hitTestView.trailingAnchor),
-        ])
-
-        panel.contentView = hitTestView
-        panel.orderFrontRegardless()
-
-        self.notchPanel = panel
     }
 
     private func observeScreenChanges() {
@@ -94,27 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func repositionWindow() {
         MainActor.assumeIsolated {
-            guard let panel = notchPanel else { return }
-            ScreenSelector.shared.refreshScreens()
-            guard let screen = ScreenSelector.shared.selectedScreen else { return }
-
-            NotchPanelManager.shared.updateGeometry(for: screen)
-            panel.setFrame(windowFrame(for: screen), display: true)
+            windowController.repositionWindow()
         }
     }
-
-    private func windowFrame(for screen: NSScreen) -> NSRect {
-        let screenFrame = screen.frame
-        return NSRect(
-            x: screenFrame.origin.x,
-            y: screenFrame.maxY - windowHeight,
-            width: screenFrame.width,
-            height: windowHeight
-        )
-    }
-
-    @MainActor private func startUsageService() {
-        ClaudeUsageService.shared.startPolling()
-    }
-
 }

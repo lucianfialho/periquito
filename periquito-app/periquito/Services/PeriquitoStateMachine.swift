@@ -9,109 +9,139 @@ private let logger = Logger(subsystem: "com.lucianfialho.periquito", category: "
 final class PeriquitoStateMachine {
     static let shared = PeriquitoStateMachine()
 
-    let sessionStore = SessionStore.shared
+    let sessionStore: SessionStore
+
+    private let reducer: HookEventReducer
+    private let parser: ConversationParser
+    private let emotionAnalyzer: EmotionAnalyzer
+    private let historyStatsLoader: HistoryStatsLoader
+    private let levelManager: LevelManager
+    private let spacedRepetitionManager: SpacedRepetitionManager
+    private let soundService: SoundService
+    private let fileWatcher: SessionFileWatcher
+    private let idleQuizCoordinator: IdleQuizCoordinator
 
     private var emotionDecayTimer: Task<Void, Never>?
-    private var idleQuizTimer: Task<Void, Never>?
     private var pendingSyncTasks: [String: Task<Void, Never>] = [:]
     private var pendingPositionMarks: [String: Task<Void, Never>] = [:]
-    private var fileWatchers: [String: (source: DispatchSourceFileSystemObject, fd: Int32)] = [:]
 
     private static let syncDebounce: Duration = .milliseconds(100)
     private static let waitingClearGuard: TimeInterval = 2.0
+
+    init(
+        sessionStore: SessionStore? = nil,
+        parser: ConversationParser? = nil,
+        emotionAnalyzer: EmotionAnalyzer? = nil,
+        historyStatsLoader: HistoryStatsLoader? = nil,
+        levelManager: LevelManager? = nil,
+        spacedRepetitionManager: SpacedRepetitionManager? = nil,
+        soundService: SoundService? = nil,
+        fileWatcher: SessionFileWatcher? = nil,
+        idleQuizCoordinator: IdleQuizCoordinator? = nil
+    ) {
+        let sessionStore = sessionStore ?? .shared
+        self.sessionStore = sessionStore
+        reducer = HookEventReducer(sessionStore: sessionStore)
+        self.parser = parser ?? .shared
+        self.emotionAnalyzer = emotionAnalyzer ?? .shared
+        self.historyStatsLoader = historyStatsLoader ?? HistoryStatsLoader(repository: FileHistoryRepository.shared)
+        self.levelManager = levelManager ?? .shared
+        self.spacedRepetitionManager = spacedRepetitionManager ?? .shared
+        self.soundService = soundService ?? .shared
+        self.fileWatcher = fileWatcher ?? SessionFileWatcher()
+        self.idleQuizCoordinator = idleQuizCoordinator ?? IdleQuizCoordinator()
+
+        startEmotionDecayTimer()
+        self.idleQuizCoordinator.start()
+    }
 
     var currentState: PeriquitoState {
         sessionStore.effectiveSession?.state ?? .idle
     }
 
-    private init() {
-        startEmotionDecayTimer()
-        startIdleQuizTimer()
-    }
-
     func handleEvent(_ event: HookEvent) {
-        let session = sessionStore.process(event)
-        let isDone = event.status == "waiting_for_input"
+        let outcome = reducer.reduce(event)
 
-        switch event.event {
-        case "UserPromptSubmit":
+        if outcome.shouldMarkCurrentPosition {
             pendingPositionMarks[event.sessionId] = Task {
-                await ConversationParser.shared.markCurrentPosition(
-                    sessionId: event.sessionId,
-                    cwd: event.cwd
-                )
-            }
-            if session.isInteractive {
-                startFileWatcher(sessionId: event.sessionId, cwd: event.cwd)
-            }
-
-            if session.isInteractive, let prompt = event.userPrompt {
-                session.isAnalyzingEnglish = true
-                Task {
-                    let result = await EmotionAnalyzer.shared.analyze(prompt)
-                    session.emotionState.recordEmotion(result.emotion, intensity: result.intensity, prompt: prompt)
-                    session.recordEnglishTip(result, prompt: prompt)
-                    session.isAnalyzingEnglish = false
-
-                    let stats = await HistoryStatsLoader.load()
-                    LevelManager.shared.awardXP(for: result.type, rollingAccuracy: stats.rollingAccuracy ?? 0)
-
-                    // Sync new corrections to spaced repetition queue
-                    if result.type == "correction" {
-                        await SpacedRepetitionManager.shared.syncFromHistory()
-                    }
-                }
-            }
-
-        case "PreToolUse":
-            if isDone {
-                SoundService.shared.playNotificationSound(sessionId: event.sessionId, isInteractive: session.isInteractive)
-            }
-
-        case "PermissionRequest":
-            SoundService.shared.playNotificationSound(sessionId: event.sessionId, isInteractive: session.isInteractive)
-
-        case "PostToolUse":
-            scheduleFileSync(sessionId: event.sessionId, cwd: event.cwd)
-
-        case "Stop":
-            SoundService.shared.playNotificationSound(sessionId: event.sessionId, isInteractive: session.isInteractive)
-            stopFileWatcher(sessionId: event.sessionId)
-            scheduleFileSync(sessionId: event.sessionId, cwd: event.cwd)
-
-        case "SessionEnd":
-            stopFileWatcher(sessionId: event.sessionId)
-            pendingSyncTasks.removeValue(forKey: event.sessionId)?.cancel()
-            pendingPositionMarks.removeValue(forKey: event.sessionId)?.cancel()
-            SoundService.shared.clearCooldown(for: event.sessionId)
-            Task { await ConversationParser.shared.resetState(for: event.sessionId) }
-            if sessionStore.activeSessionCount == 0 {
-                logger.info("Global state: idle")
-            }
-            return
-
-        default:
-            if isDone && session.task != .idle {
-                SoundService.shared.playNotificationSound(sessionId: event.sessionId, isInteractive: session.isInteractive)
+                await parser.markCurrentPosition(sessionId: event.sessionId, cwd: event.cwd)
             }
         }
 
-        session.resetSleepTimer()
+        if outcome.shouldStartFileWatcher {
+            fileWatcher.startWatching(sessionId: event.sessionId, cwd: event.cwd) { [weak self] in
+                self?.scheduleFileSync(sessionId: event.sessionId, cwd: event.cwd)
+            }
+        }
+
+        if let prompt = outcome.promptToAnalyze {
+            analyzePrompt(prompt, for: outcome.session)
+        }
+
+        if outcome.shouldPlayNotification {
+            soundService.playNotificationSound(
+                sessionId: event.sessionId,
+                isInteractive: outcome.session.isInteractive
+            )
+        }
+
+        if outcome.shouldStopFileWatcher {
+            fileWatcher.stopWatching(sessionId: event.sessionId)
+        }
+
+        if outcome.shouldScheduleFileSync {
+            scheduleFileSync(sessionId: event.sessionId, cwd: event.cwd)
+        }
+
+        if outcome.endedSession {
+            pendingSyncTasks.removeValue(forKey: event.sessionId)?.cancel()
+            pendingPositionMarks.removeValue(forKey: event.sessionId)?.cancel()
+            soundService.clearCooldown(for: event.sessionId)
+
+            if outcome.shouldResetParser {
+                Task { await parser.resetState(for: event.sessionId) }
+            }
+
+            if sessionStore.activeSessionCount == 0 {
+                logger.info("Global state: idle")
+            }
+
+            return
+        }
+
+        outcome.session.resetSleepTimer()
+    }
+
+    private func analyzePrompt(_ prompt: String, for session: SessionData) {
+        session.isAnalyzingEnglish = true
+
+        Task {
+            let result = await emotionAnalyzer.analyze(prompt)
+            session.emotionState.recordEmotion(result.emotion, intensity: result.intensity, prompt: prompt)
+            session.recordEnglishTip(result, prompt: prompt)
+            session.isAnalyzingEnglish = false
+
+            let stats = await historyStatsLoader.load()
+            levelManager.awardXP(for: result.type, rollingAccuracy: stats.rollingAccuracy ?? 0)
+
+            if result.type == .correction {
+                await spacedRepetitionManager.syncFromHistory()
+            }
+        }
     }
 
     private func scheduleFileSync(sessionId: String, cwd: String) {
         pendingSyncTasks[sessionId]?.cancel()
+
         pendingSyncTasks[sessionId] = Task {
-            // Wait for position marking to complete first
             await pendingPositionMarks[sessionId]?.value
 
             try? await Task.sleep(for: Self.syncDebounce)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                return
+            }
 
-            let result = await ConversationParser.shared.parseIncremental(
-                sessionId: sessionId,
-                cwd: cwd
-            )
+            let result = await parser.parseIncremental(sessionId: sessionId, cwd: cwd)
 
             if !result.messages.isEmpty {
                 sessionStore.recordAssistantMessages(result.messages, for: sessionId)
@@ -126,7 +156,7 @@ final class PeriquitoStateMachine {
                 session.updateTask(.idle)
                 session.updateProcessingState(isProcessing: false)
             } else if session.task == .waiting,
-                      Date().timeIntervalSince(session.lastActivity) > Self.waitingClearGuard {
+                      Date.now.timeIntervalSince(session.lastActivity) > Self.waitingClearGuard {
                 session.clearPendingQuestions()
                 session.updateTask(.working)
             }
@@ -135,83 +165,16 @@ final class PeriquitoStateMachine {
         }
     }
 
-    private func startFileWatcher(sessionId: String, cwd: String) {
-        stopFileWatcher(sessionId: sessionId)
-
-        let sessionFile = ConversationParser.sessionFilePath(sessionId: sessionId, cwd: cwd)
-
-        let fd = open(sessionFile, O_EVTONLY)
-        guard fd >= 0 else {
-            logger.warning("Could not open file for watching: \(sessionFile)")
-            return
-        }
-
-        let source = DispatchSource.makeFileSystemObjectSource(
-            fileDescriptor: fd,
-            eventMask: [.write, .extend],
-            queue: .main
-        )
-
-        source.setEventHandler { [weak self] in
-            self?.scheduleFileSync(sessionId: sessionId, cwd: cwd)
-        }
-
-        source.setCancelHandler {
-            close(fd)
-        }
-
-        source.resume()
-        fileWatchers[sessionId] = (source: source, fd: fd)
-        logger.debug("Started file watcher for session \(sessionId)")
-    }
-
-    private func stopFileWatcher(sessionId: String) {
-        guard let watcher = fileWatchers.removeValue(forKey: sessionId) else { return }
-        watcher.source.cancel()
-        logger.debug("Stopped file watcher for session \(sessionId)")
-    }
-
     private func startEmotionDecayTimer() {
         emotionDecayTimer = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: EmotionState.decayInterval)
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else {
+                    return
+                }
+
                 for session in sessionStore.sessions.values {
                     session.emotionState.decayAll()
-                }
-            }
-        }
-    }
-
-    private func startIdleQuizTimer() {
-        let idleDetector = IdleDetector.shared
-        idleDetector.start()
-
-        // Sync review items from history on startup
-        Task {
-            await SpacedRepetitionManager.shared.syncFromHistory()
-        }
-
-        idleQuizTimer = Task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
-                guard !Task.isCancelled else { return }
-
-                if idleDetector.shouldTriggerQuiz() {
-                    let quizManager = SpacedRepetitionManager.shared
-                    // Sync latest corrections before picking a quiz
-                    await quizManager.syncFromHistory()
-
-                    if quizManager.quizState == .idle && quizManager.startQuiz() {
-                        idleDetector.recordQuizTriggered()
-                        // Expand the notch to show the quiz
-                        NotchPanelManager.shared.expand()
-                        // Play a gentle sound
-                        if let sound = NSSound(named: NSSound.Name("Pop")) {
-                            sound.play()
-                        }
-                        logger.info("Triggered spaced repetition quiz (idle on: \(idleDetector.detectedApp ?? "unknown"))")
-                    }
                 }
             }
         }

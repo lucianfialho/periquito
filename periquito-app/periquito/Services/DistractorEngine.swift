@@ -1,7 +1,7 @@
 import Foundation
 
 /// Shared type representing a parsed correction from history.jsonl
-struct HistoryCorrection {
+nonisolated struct HistoryCorrection {
     let id: String
     let wrong: String
     let right: String
@@ -10,7 +10,7 @@ struct HistoryCorrection {
 }
 
 /// Builds shuffled quiz option arrays from correction history.
-struct DistractorEngine {
+nonisolated struct DistractorEngine {
 
     /// Returns shuffled quiz options for a quiz item.
     /// - Pulls up to 2 extra distractors from the same category in `corrections`.
@@ -26,42 +26,37 @@ struct DistractorEngine {
     }
 
     /// Loads and parses all corrections from history.jsonl.
-    static func loadFromHistory() async -> [HistoryCorrection] {
-        let fileURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".english-learning")
-            .appendingPathComponent("history.jsonl")
+    static func loadFromHistory(
+        repository: (any HistoryRepository)? = nil
+    ) async -> [HistoryCorrection] {
+        let repository = if let repository {
+            repository
+        } else {
+            await MainActor.run { FileHistoryRepository.shared }
+        }
 
-        return await Task.detached {
-            guard FileManager.default.fileExists(atPath: fileURL.path),
-                  let content = try? String(contentsOf: fileURL, encoding: .utf8) else {
-                return []
+        guard let entries = try? await repository.loadEntries() else {
+            return []
+        }
+
+        return entries.compactMap { entry in
+            guard entry.type == .correction, let tip = entry.tip else {
+                return nil
             }
 
-            var corrections: [HistoryCorrection] = []
-            for line in content.split(separator: "\n") {
-                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty,
-                      let data = trimmed.data(using: .utf8),
-                      let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let type = obj["type"] as? String,
-                      type == "correction",
-                      let tip = obj["tip"] as? String else { continue }
-
-                let category = obj["category"] as? String ?? "grammar"
-                let parsed = parseTip(tip)
-                guard !parsed.wrong.isEmpty, !parsed.right.isEmpty else { continue }
-
-                let id = UUID().uuidString
-                corrections.append(HistoryCorrection(
-                    id: id,
-                    wrong: parsed.wrong,
-                    right: parsed.right,
-                    why: parsed.why,
-                    category: category
-                ))
+            let parsed = parseTip(tip)
+            guard !parsed.wrong.isEmpty, !parsed.right.isEmpty else {
+                return nil
             }
-            return corrections
-        }.value
+
+            return HistoryCorrection(
+                id: UUID().uuidString,
+                wrong: parsed.wrong,
+                right: parsed.right,
+                why: parsed.why,
+                category: entry.category ?? "grammar"
+            )
+        }
     }
 
     // MARK: - Tip parsing

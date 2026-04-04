@@ -1,31 +1,11 @@
 import SwiftUI
 
-private enum PanelTab: String, CaseIterable {
-    case tips = "Tips"
-    case stats = "Stats"
-}
-
+@MainActor
 struct ExpandedPanelView: View {
-    let sessionStore: SessionStore
+    @Bindable var viewModel: ExpandedPanelViewModel
     @Binding var showingSettings: Bool
     @Binding var isActivityCollapsed: Bool
-    @State private var selectedTab: PanelTab = .tips
-    @State private var historyStats: HistoryStats?
-    @State private var accuracyDelta: Int = 0
-    @State private var showDelta: Bool = false
-    var quizManager: SpacedRepetitionManager = .shared
-
-    private var state: PeriquitoState {
-        sessionStore.unifiedState
-    }
-
-    private var showIndicator: Bool {
-        state.task == .working || state.task == .compacting || state.task == .waiting
-    }
-
-    private var tips: [EnglishTip] {
-        sessionStore.allTips
-    }
+    @State private var settingsViewModel = PanelSettingsViewModel()
 
     var body: some View {
         GeometryReader { geometry in
@@ -35,7 +15,7 @@ struct ExpandedPanelView: View {
                         .transition(.move(edge: .leading).combined(with: .opacity))
                 }
 
-                PanelSettingsView()
+                PanelSettingsView(viewModel: settingsViewModel)
                     .frame(width: geometry.size.width)
                     .offset(x: showingSettings ? 0 : geometry.size.width)
                     .opacity(showingSettings ? 1 : 0)
@@ -62,43 +42,42 @@ struct ExpandedPanelView: View {
                 } else {
                     Divider().background(Color.white.opacity(0.08))
                     tabBar
-
-                    if selectedTab == .tips {
-                        if quizManager.quizState != .idle {
-                            quizSection
-                        } else if !tips.isEmpty {
-                            tipsSection
-                        } else {
-                            Spacer()
-                            emptyState
-                        }
-                    } else {
-                        StatsView(stats: historyStats, levelManager: LevelManager.shared)
-                    }
-
+                    contentSection
                     Spacer()
 
-                    if showIndicator {
-                        WorkingIndicatorView(state: state)
+                    if viewModel.showIndicator {
+                        WorkingIndicatorView(state: viewModel.state)
                     }
                 }
             }
             .padding(.horizontal, 12)
-            .task { await loadStats() }
-            .onChange(of: tips.count) { _, _ in
-                Task { await loadStats() }
+            .task { await viewModel.loadStats() }
+            .onChange(of: viewModel.tips.count) { _, _ in
+                Task { await viewModel.loadStats() }
             }
         }
         .padding(.bottom, 5)
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    private var isAnalyzing: Bool {
-        sessionStore.isAnyAnalyzing
-    }
-
-    private var currentEmotion: PeriquitoEmotion {
-        sessionStore.currentEmotion
+    @ViewBuilder
+    private var contentSection: some View {
+        if viewModel.selectedTab == .tips {
+            if viewModel.quizManager.quizState != .idle {
+                quizSection
+            } else if !viewModel.tips.isEmpty {
+                tipsSection
+            } else {
+                Spacer()
+                emptyState
+            }
+        } else {
+            StatsView(
+                stats: viewModel.historyStats,
+                levelManager: viewModel.levelManager,
+                quizManager: viewModel.quizManager
+            )
+        }
     }
 
     private var tabBar: some View {
@@ -106,16 +85,16 @@ struct ExpandedPanelView: View {
             ForEach(PanelTab.allCases, id: \.self) { tab in
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedTab = tab
+                        viewModel.selectTab(tab)
                     }
                 }) {
                     VStack(spacing: 4) {
                         Text(tab.rawValue)
-                            .font(.system(size: 11, weight: selectedTab == tab ? .semibold : .regular))
-                            .foregroundColor(selectedTab == tab ? TerminalColors.primaryText : TerminalColors.dimmedText)
+                            .font(.system(size: 11, weight: viewModel.selectedTab == tab ? .semibold : .regular))
+                            .foregroundColor(viewModel.selectedTab == tab ? TerminalColors.primaryText : TerminalColors.dimmedText)
 
                         Rectangle()
-                            .fill(selectedTab == tab ? TerminalColors.green : Color.clear)
+                            .fill(viewModel.selectedTab == tab ? TerminalColors.green : Color.clear)
                             .frame(height: 1.5)
                     }
                     .frame(maxWidth: .infinity)
@@ -128,54 +107,29 @@ struct ExpandedPanelView: View {
         .padding(.bottom, 4)
     }
 
-    private func loadStats() async {
-        let old = historyStats?.accuracy ?? 0
-        historyStats = await HistoryStatsLoader.load()
-        let new = historyStats?.accuracy ?? 0
-        let delta = new - old
-        if delta != 0 && old != 0 {
-            await MainActor.run {
-                accuracyDelta = delta
-                showDelta = true
-            }
-            try? await Task.sleep(for: .seconds(2.5))
-            await MainActor.run { showDelta = false }
-        }
-    }
-
-    private var collapsedAccuracyColor: Color {
-        guard let acc = historyStats?.accuracy else { return TerminalColors.dimmedText }
-        if acc >= 80 { return TerminalColors.green }
-        if acc >= 50 { return TerminalColors.amber }
-        return Color(red: 0.95, green: 0.4, blue: 0.35)
-    }
-
     private var collapsedStatsRow: some View {
         HStack(spacing: 10) {
-            // Accuracy
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(historyStats.flatMap { $0.accuracy.map { "\($0)" } } ?? "--")
+                Text(viewModel.historyStats.flatMap { $0.accuracy.map { "\($0)" } } ?? "--")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundColor(collapsedAccuracyColor)
+                    .foregroundColor(viewModel.collapsedAccuracyColor)
                 Text("%")
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(collapsedAccuracyColor.opacity(0.7))
+                    .foregroundColor(viewModel.collapsedAccuracyColor.opacity(0.7))
             }
 
-            // Delta arrow
-            if showDelta {
+            if viewModel.showDelta {
                 HStack(spacing: 2) {
-                    Image(systemName: accuracyDelta > 0 ? "arrow.up" : "arrow.down")
+                    Image(systemName: viewModel.accuracyDelta > 0 ? "arrow.up" : "arrow.down")
                         .font(.system(size: 9, weight: .bold))
-                    Text("\(abs(accuracyDelta))%")
+                    Text("\(abs(viewModel.accuracyDelta))%")
                         .font(.system(size: 9, weight: .semibold))
                 }
-                .foregroundColor(accuracyDelta > 0 ? TerminalColors.green : TerminalColors.amber)
+                .foregroundColor(viewModel.accuracyDelta > 0 ? TerminalColors.green : TerminalColors.amber)
                 .transition(.scale(scale: 0.7).combined(with: .opacity))
             }
 
-            // Good / Corrections
-            if let stats = historyStats, stats.totalEvaluated > 0 {
+            if let stats = viewModel.historyStats, stats.totalEvaluated > 0 {
                 HStack(spacing: 4) {
                     Image(systemName: "hand.thumbsup.fill")
                         .font(.system(size: 9))
@@ -197,15 +151,13 @@ struct ExpandedPanelView: View {
 
             Spacer()
 
-            // Level badge
-            let level = LevelManager.shared.level
-            Text("\(level.emoji) \(level.name)")
+            Text("\(viewModel.levelManager.level.emoji) \(viewModel.levelManager.level.name)")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(TerminalColors.dimmedText)
         }
         .padding(.horizontal, 4)
         .padding(.top, 5)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showDelta)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: viewModel.showDelta)
     }
 
     private var quizSection: some View {
@@ -213,20 +165,20 @@ struct ExpandedPanelView: View {
             if !isActivityCollapsed {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 8) {
-                        // Show recent tips above quiz
-                        ForEach(tips.suffix(3)) { tip in
-                            ChatTipView(tip: tip, emotion: currentEmotion)
+                        ForEach(viewModel.tips.suffix(3)) { tip in
+                            ChatTipView(tip: tip, emotion: viewModel.currentEmotion)
                         }
 
                         QuizBubbleView(
-                            quizState: quizManager.quizState,
-                            options: quizManager.currentOptions,
-                            correctAnswer: quizManager.currentQuiz?.correctSentence ?? "",
+                            quizState: viewModel.quizManager.quizState,
+                            options: viewModel.quizManager.currentOptions,
+                            currentQuiz: viewModel.quizManager.currentQuiz,
+                            correctAnswer: viewModel.quizManager.currentQuiz?.correctSentence ?? "",
                             onSubmit: { answer in
-                                quizManager.submitAnswer(answer)
+                                viewModel.quizManager.submitAnswer(answer)
                             },
                             onDismiss: {
-                                quizManager.dismissQuiz()
+                                viewModel.quizManager.dismissQuiz()
                             }
                         )
                     }
@@ -242,44 +194,42 @@ struct ExpandedPanelView: View {
     private var tipsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !isActivityCollapsed {
-                VStack(alignment: .leading, spacing: 0) {
-                    ScrollViewReader { proxy in
-                        ScrollView(showsIndicators: false) {
-                            VStack(spacing: 8) {
-                                ForEach(tips) { tip in
-                                    ChatTipView(tip: tip, emotion: currentEmotion)
-                                        .id(tip.id)
-                                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                                }
-
-                                if isAnalyzing {
-                                    TypingIndicatorView()
-                                        .id("typing")
-                                }
+                ScrollViewReader { proxy in
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 8) {
+                            ForEach(viewModel.tips) { tip in
+                                ChatTipView(tip: tip, emotion: viewModel.currentEmotion)
+                                    .id(tip.id)
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
                             }
-                            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: tips.count)
-                            .padding(.top, 8)
-                            .padding(.bottom, 4)
-                            .frame(maxWidth: .infinity)
+
+                            if viewModel.isAnalyzing {
+                                TypingIndicatorView()
+                                    .id("typing")
+                            }
                         }
-                        .frame(maxHeight: 200)
-                        .onAppear {
-                            if let lastTip = tips.last {
+                        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.tips.count)
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
+                        .frame(maxWidth: .infinity)
+                    }
+                    .frame(maxHeight: 200)
+                    .onAppear {
+                        if let lastTip = viewModel.tips.last {
+                            proxy.scrollTo(lastTip.id, anchor: .bottom)
+                        }
+                    }
+                    .onChange(of: viewModel.tips.count) { _, _ in
+                        if let lastTip = viewModel.tips.last {
+                            withAnimation(.easeOut(duration: 0.2)) {
                                 proxy.scrollTo(lastTip.id, anchor: .bottom)
                             }
                         }
-                        .onChange(of: tips.count) { _, _ in
-                            if let lastTip = tips.last {
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    proxy.scrollTo(lastTip.id, anchor: .bottom)
-                                }
-                            }
-                        }
-                        .onChange(of: isAnalyzing) { _, analyzing in
-                            if analyzing {
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    proxy.scrollTo("typing", anchor: .bottom)
-                                }
+                    }
+                    .onChange(of: viewModel.isAnalyzing) { _, analyzing in
+                        if analyzing {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                proxy.scrollTo("typing", anchor: .bottom)
                             }
                         }
                     }
@@ -290,318 +240,14 @@ struct ExpandedPanelView: View {
     }
 
     private var emptyState: some View {
-        let hooksInstalled = HookInstaller.isInstalled()
-        let title = hooksInstalled ? "Write in English!" : "Hooks not installed"
-        let subtitle = hooksInstalled
-            ? "Periquito analyzes your English in Claude Code prompts"
-            : "Open settings to set up Claude Code integration"
-
-        return VStack(spacing: 8) {
-            Text(title)
+        VStack(spacing: 8) {
+            Text(viewModel.emptyStateTitle)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(TerminalColors.secondaryText)
-            Text(subtitle)
+            Text(viewModel.emptyStateSubtitle)
                 .font(.system(size: 12))
                 .foregroundColor(TerminalColors.dimmedText)
         }
         .frame(maxWidth: .infinity)
-    }
-}
-
-// MARK: - Chat-style Tip View
-
-struct ChatTipView: View {
-    let tip: EnglishTip
-    var emotion: PeriquitoEmotion = .neutral
-    private var fontSize: AppSettings.FontSize { AppSettings.fontSize }
-
-    private static let goodPhrases = [
-        "Solid English.", "Reads naturally.", "Well put.", "Clean grammar.",
-        "No issues here.", "Nailed it.", "Perfect.", "Nice one."
-    ]
-
-    private var goodMessage: String {
-        if emotion == .sad {
-            return "Better! Keep going."
-        }
-        let index = abs(tip.id.hashValue) % Self.goodPhrases.count
-        return Self.goodPhrases[index]
-    }
-
-    private var goodBubbleColor: Color {
-        switch emotion {
-        case .happy: return TerminalColors.green.opacity(0.18)
-        case .sad: return TerminalColors.green.opacity(0.06)
-        default: return TerminalColors.green.opacity(0.12)
-        }
-    }
-
-    private var correctionBubbleColor: Color {
-        switch emotion {
-        case .sob: return Color(red: 0.9, green: 0.3, blue: 0.2).opacity(0.12)
-        default: return TerminalColors.amber.opacity(0.08)
-        }
-    }
-
-    private var parsedParts: [(wrong: String, right: String, why: String)] {
-        guard let tipText = tip.tip else { return [] }
-        // Split by ";" or by multiple ❌ markers for multi-correction tips
-        let segments = tipText.components(separatedBy: "; ")
-        var parts: [(wrong: String, right: String, why: String)] = []
-
-        for segment in segments {
-            let trimmed = segment.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty { continue }
-
-            // Try to parse "❌ X → ✅ Y — Z" format
-            if let arrowRange = trimmed.range(of: " → ") {
-                let wrongPart = String(trimmed[trimmed.startIndex..<arrowRange.lowerBound])
-                    .replacingOccurrences(of: "❌ ", with: "")
-                    .replacingOccurrences(of: "❌", with: "")
-                    .trimmingCharacters(in: .whitespaces)
-                let afterArrow = String(trimmed[arrowRange.upperBound...])
-
-                if let dashRange = afterArrow.range(of: " — ") {
-                    let rightPart = String(afterArrow[afterArrow.startIndex..<dashRange.lowerBound])
-                        .replacingOccurrences(of: "✅ ", with: "")
-                        .replacingOccurrences(of: "✅", with: "")
-                        .trimmingCharacters(in: .whitespaces)
-                    let whyPart = String(afterArrow[dashRange.upperBound...])
-                        .trimmingCharacters(in: .whitespaces)
-                    parts.append((wrong: wrongPart, right: rightPart, why: whyPart))
-                } else {
-                    let rightPart = afterArrow
-                        .replacingOccurrences(of: "✅ ", with: "")
-                        .replacingOccurrences(of: "✅", with: "")
-                        .trimmingCharacters(in: .whitespaces)
-                    parts.append((wrong: wrongPart, right: rightPart, why: ""))
-                }
-            } else {
-                parts.append((wrong: "", right: "", why: trimmed))
-            }
-        }
-        return parts
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 6) {
-            Text("🦜")
-                .font(.system(size: 14))
-
-            VStack(alignment: .leading, spacing: 0) {
-                if tip.type == "good" {
-                    goodBubble
-                } else {
-                    correctionBubbles
-                }
-            }
-
-            Spacer()
-        }
-    }
-
-    private var goodBubble: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(goodMessage)
-                .font(.system(size: fontSize.tipFont))
-                .foregroundColor(emotion == .sad ? TerminalColors.green.opacity(0.7) : TerminalColors.green)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(goodBubbleColor)
-                .cornerRadius(12, corners: [.topLeft, .topRight, .bottomRight])
-
-            if let tipText = tip.tip, !tipText.isEmpty {
-                Text(tipText)
-                    .font(.system(size: fontSize.promptFont))
-                    .foregroundColor(TerminalColors.dimmedText.opacity(0.85))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.04))
-                    .cornerRadius(10, corners: [.topLeft, .topRight, .bottomRight])
-            }
-
-            if let category = tip.category {
-                Text(category)
-                    .font(.system(size: fontSize.promptFont - 1, weight: .medium))
-                    .foregroundColor(TerminalColors.dimmedText)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(Color.white.opacity(0.06))
-                    .cornerRadius(4)
-                    .padding(.leading, 4)
-            }
-        }
-    }
-
-    private var correctionBubbles: some View {
-        let parts = parsedParts
-
-        return VStack(alignment: .leading, spacing: 4) {
-            if parts.isEmpty, let tipText = tip.tip {
-                // Fallback: show raw text in a bubble
-                Text(tipText)
-                    .font(.system(size: fontSize.tipFont))
-                    .foregroundColor(.white.opacity(0.9))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(TerminalColors.amber.opacity(0.12))
-                    .cornerRadius(12, corners: [.topLeft, .topRight, .bottomRight])
-            } else {
-                ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
-                    VStack(alignment: .leading, spacing: 4) {
-                        if !part.wrong.isEmpty {
-                            HStack(spacing: 4) {
-                                Text(part.wrong)
-                                    .font(.system(size: fontSize.tipFont))
-                                    .strikethrough()
-                                    .foregroundColor(TerminalColors.red.opacity(0.8))
-                                Text("→")
-                                    .font(.system(size: fontSize.tipFont))
-                                    .foregroundColor(TerminalColors.dimmedText)
-                                Text(part.right)
-                                    .font(.system(size: fontSize.tipFont, weight: .medium))
-                                    .foregroundColor(TerminalColors.green)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(correctionBubbleColor)
-                            .cornerRadius(10, corners: [.topLeft, .topRight, .bottomRight])
-                        }
-
-                        if !part.why.isEmpty {
-                            Text(part.why)
-                                .font(.system(size: fontSize.promptFont))
-                                .foregroundColor(TerminalColors.dimmedText.opacity(0.7))
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.leading, 4)
-                        }
-                    }
-                }
-            }
-
-            if let category = tip.category {
-                Text(category)
-                    .font(.system(size: fontSize.promptFont - 1, weight: .medium))
-                    .foregroundColor(TerminalColors.dimmedText)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(Color.white.opacity(0.06))
-                    .cornerRadius(4)
-                    .padding(.leading, 4)
-            }
-        }
-    }
-}
-
-// Helper for selective corner radius (macOS-compatible)
-struct Corner: OptionSet {
-    let rawValue: Int
-    static let topLeft = Corner(rawValue: 1 << 0)
-    static let topRight = Corner(rawValue: 1 << 1)
-    static let bottomLeft = Corner(rawValue: 1 << 2)
-    static let bottomRight = Corner(rawValue: 1 << 3)
-}
-
-extension View {
-    func cornerRadius(_ radius: CGFloat, corners: Corner) -> some View {
-        clipShape(RoundedCorners(radius: radius, corners: corners))
-    }
-}
-
-struct RoundedCorners: Shape {
-    var radius: CGFloat
-    var corners: Corner
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let tl = corners.contains(.topLeft) ? radius : 0
-        let tr = corners.contains(.topRight) ? radius : 0
-        let bl = corners.contains(.bottomLeft) ? radius : 0
-        let br = corners.contains(.bottomRight) ? radius : 0
-
-        path.move(to: CGPoint(x: rect.minX + tl, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX - tr, y: rect.minY))
-        if tr > 0 { path.addArc(center: CGPoint(x: rect.maxX - tr, y: rect.minY + tr), radius: tr, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false) }
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
-        if br > 0 { path.addArc(center: CGPoint(x: rect.maxX - br, y: rect.maxY - br), radius: br, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false) }
-        path.addLine(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
-        if bl > 0 { path.addArc(center: CGPoint(x: rect.minX + bl, y: rect.maxY - bl), radius: bl, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false) }
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + tl))
-        if tl > 0 { path.addArc(center: CGPoint(x: rect.minX + tl, y: rect.minY + tl), radius: tl, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false) }
-        return path
-    }
-}
-
-// MARK: - Typing Indicator
-
-struct TypingIndicatorView: View {
-    var body: some View {
-        HStack(alignment: .top, spacing: 6) {
-            Text("🦜")
-                .font(.system(size: 14))
-
-            TimelineView(.periodic(from: .now, by: 0.4)) { timeline in
-                let phase = Int(timeline.date.timeIntervalSinceReferenceDate / 0.4) % 3
-                HStack(spacing: 3) {
-                    ForEach(0..<3, id: \.self) { i in
-                        let distance = min(abs(i - phase), 3 - abs(i - phase))
-                        Circle()
-                            .fill(Color.white.opacity(0.5))
-                            .frame(width: 5, height: 5)
-                            .opacity(distance == 0 ? 1.0 : (distance == 1 ? 0.5 : 0.2))
-                            .animation(.easeInOut(duration: 0.3), value: phase)
-                    }
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color.white.opacity(0.08))
-            .cornerRadius(12, corners: [.topLeft, .topRight, .bottomRight])
-
-            Spacer()
-        }
-    }
-}
-
-// MARK: - Supporting Views
-
-struct PanelHeaderButton: View {
-    let sfSymbol: String
-    let action: () -> Void
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: sfSymbol)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white.opacity(0.7))
-                .frame(width: 32, height: 32)
-                .background(isHovered ? TerminalColors.hoverBackground : TerminalColors.subtleBackground)
-                .clipShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            isHovered = hovering
-        }
-    }
-}
-
-struct ModeBadgeView: View {
-    let mode: String
-
-    var color: Color {
-        switch mode {
-        case "Plan Mode": TerminalColors.planMode
-        case "Accept Edits": TerminalColors.acceptEdits
-        default: TerminalColors.secondaryText
-        }
-    }
-
-    var body: some View {
-        Text(mode)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundColor(color)
     }
 }

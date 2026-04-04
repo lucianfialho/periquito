@@ -9,7 +9,7 @@ private enum SpriteLayout {
 struct GrassIslandView: View {
     let state: PeriquitoState
 
-    @ObservedObject private var sponsorService = SponsorService.shared
+    @State private var sponsorService = SponsorService.shared
     private let patchWidth: CGFloat = 80
 
     var body: some View {

@@ -13,7 +13,7 @@ struct EnglishTip: Identifiable {
     let id = UUID()
     let timestamp: Date
     let prompt: String
-    let type: String       // "good", "correction", "skip"
+    let type: EnglishEvaluationType
     let tip: String?
     let category: String?
 }
@@ -174,7 +174,7 @@ final class SessionData: Identifiable {
     }
 
     func recordEnglishTip(_ result: EmotionAnalyzer.AnalysisResult, prompt: String) {
-        guard result.type != "skip" else { return }
+        guard result.type != .skip else { return }
         let tip = EnglishTip(
             timestamp: Date(),
             prompt: String(prompt.prefix(100)),

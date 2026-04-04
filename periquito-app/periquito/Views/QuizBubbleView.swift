@@ -3,6 +3,7 @@ import SwiftUI
 struct QuizBubbleView: View {
     let quizState: QuizState
     let options: [String]
+    let currentQuiz: QuizItem?
     let correctAnswer: String
     let onSubmit: (String) -> Void
     let onDismiss: () -> Void
@@ -183,11 +184,6 @@ struct QuizBubbleView: View {
                 .buttonStyle(.plain)
             }
         }
-    }
-
-    private var currentQuiz: QuizItem? {
-        if case .asking(let item) = quizState { return item }
-        return SpacedRepetitionManager.shared.currentQuiz
     }
 
     private func progressBadge(quiz: QuizItem) -> some View {

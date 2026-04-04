@@ -17,12 +17,7 @@ final class LevelManager {
     var lastDecayDays: Int = 0
     private(set) var didLevelUp: Bool = false
 
-    private static let levelFile: URL = {
-        let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".english-learning")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("level.json")
-    }()
+    private static let levelFile = AppPaths.levelFile
 
     private init() {
         load()
@@ -30,12 +25,15 @@ final class LevelManager {
 
     // MARK: - XP
 
-    func awardXP(for type: String, rollingAccuracy: Int) {
+    func awardXP(for type: EnglishEvaluationType, rollingAccuracy: Int) {
         let points: Int
         switch type {
-        case "good": points = 10
-        case "correction": points = 5
-        default: return
+        case .good:
+            points = 10
+        case .correction:
+            points = 5
+        case .skip, .other:
+            return
         }
 
         xp += points
@@ -55,8 +53,7 @@ final class LevelManager {
         if newLevel.rawValue > level.rawValue {
             didLevelUp = true
             level = newLevel
-            // Play glass sound on level up
-            if let sound = NSSound(named: NSSound.Name("Glass")) {
+            if let sound = NSSound(named: .periquitoGlass) {
                 sound.play()
             }
             logger.info("Level up! Now \(self.level.name)")

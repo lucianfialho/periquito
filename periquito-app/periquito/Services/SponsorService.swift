@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 
 struct Sponsor: Codable, Identifiable {
     let id: String
@@ -10,12 +9,15 @@ struct Sponsor: Codable, Identifiable {
 }
 
 @MainActor
-final class SponsorService: ObservableObject {
+@Observable
+final class SponsorService {
     static let shared = SponsorService()
 
-    @Published private(set) var sponsors: [Sponsor] = []
+    private(set) var sponsors: [Sponsor] = []
 
     private let jsonURL = URL(string: "https://raw.githubusercontent.com/lucianfialho/periquito/main/sponsors.json")!
+
+    init() {}
 
     func load() async {
         guard let (data, _) = try? await URLSession.shared.data(from: jsonURL) else { return }

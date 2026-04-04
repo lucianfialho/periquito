@@ -1,6 +1,8 @@
 import Foundation
 
 struct AppSettings {
+    static var settingsStore: SettingsStoring = UserDefaultsSettingsStore()
+
     private static let notificationSoundKey = "notificationSound"
     private static let isMutedKey = "isMuted"
     private static let previousSoundKey = "previousNotificationSound"
@@ -8,8 +10,8 @@ struct AppSettings {
     private static let fontSizeKey = "fontSize"
 
     static var isUsageEnabled: Bool {
-        get { UserDefaults.standard.bool(forKey: isUsageEnabledKey) }
-        set { UserDefaults.standard.set(newValue, forKey: isUsageEnabledKey) }
+        get { settingsStore.bool(forKey: isUsageEnabledKey) }
+        set { settingsStore.set(newValue, forKey: isUsageEnabledKey) }
     }
 
     static var anthropicApiKey: String? {
@@ -19,20 +21,20 @@ struct AppSettings {
 
     static var notificationSound: NotificationSound {
         get {
-            guard let rawValue = UserDefaults.standard.string(forKey: notificationSoundKey),
+            guard let rawValue = settingsStore.string(forKey: notificationSoundKey),
                   let sound = NotificationSound(rawValue: rawValue) else {
                 return .purr
             }
             return sound
         }
         set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: notificationSoundKey)
+            settingsStore.set(newValue.rawValue, forKey: notificationSoundKey)
         }
     }
 
     static var isMuted: Bool {
-        get { UserDefaults.standard.bool(forKey: isMutedKey) }
-        set { UserDefaults.standard.set(newValue, forKey: isMutedKey) }
+        get { settingsStore.bool(forKey: isMutedKey) }
+        set { settingsStore.set(newValue, forKey: isMutedKey) }
     }
 
     static func toggleMute() {
@@ -86,26 +88,26 @@ struct AppSettings {
 
     static var fontSize: FontSize {
         get {
-            guard let raw = UserDefaults.standard.string(forKey: fontSizeKey),
+            guard let raw = settingsStore.string(forKey: fontSizeKey),
                   let size = FontSize(rawValue: raw) else {
                 return .regular
             }
             return size
         }
         set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: fontSizeKey)
+            settingsStore.set(newValue.rawValue, forKey: fontSizeKey)
         }
     }
 
     private static var previousSound: NotificationSound? {
         get {
-            guard let rawValue = UserDefaults.standard.string(forKey: previousSoundKey) else {
+            guard let rawValue = settingsStore.string(forKey: previousSoundKey) else {
                 return nil
             }
             return NotificationSound(rawValue: rawValue)
         }
         set {
-            UserDefaults.standard.set(newValue?.rawValue, forKey: previousSoundKey)
+            settingsStore.set(newValue?.rawValue, forKey: previousSoundKey)
         }
     }
 }
