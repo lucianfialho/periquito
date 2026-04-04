@@ -5,126 +5,92 @@ enum NotchConstants {
     static let expandedPanelHorizontalPadding: CGFloat = 19 * 2
 }
 
-extension Notification.Name {
-    static let periquitoShouldCollapse = Notification.Name("periquitoShouldCollapse")
-}
-
 private let cornerRadiusInsets = (
     opened: (top: CGFloat(19), bottom: CGFloat(24)),
     closed: (top: CGFloat(6), bottom: CGFloat(14))
 )
 
+@MainActor
 struct NotchContentView: View {
-    var stateMachine: PeriquitoStateMachine = .shared
-    var panelManager: NotchPanelManager = .shared
-    var usageService: ClaudeUsageService = .shared
-    @State private var showingPanelSettings = false
-    @State private var isMuted = AppSettings.isMuted
-    @State private var isActivityCollapsed = false
+    @State private var viewModel: NotchViewModel
+    @State private var expandedPanelViewModel: ExpandedPanelViewModel
 
-    private var sessionStore: SessionStore {
-        stateMachine.sessionStore
-    }
-
-    private var notchSize: CGSize { panelManager.notchSize }
-    private var isExpanded: Bool { panelManager.isExpanded }
-
-    private var panelAnimation: Animation {
-        isExpanded
-            ? .spring(response: 0.5, dampingFraction: 0.75, blendDuration: 0.1)
-            : .spring(response: 0.35, dampingFraction: 0.9)
-    }
-
-    private var sideWidth: CGFloat {
-        max(0, notchSize.height - 12) + 24
-    }
-
-    private var topCornerRadius: CGFloat {
-        isExpanded ? cornerRadiusInsets.opened.top : cornerRadiusInsets.closed.top
-    }
-
-    private var bottomCornerRadius: CGFloat {
-        isExpanded ? cornerRadiusInsets.opened.bottom : cornerRadiusInsets.closed.bottom
-    }
-
-    private var grassHeight: CGFloat {
-        let expandedPanelHeight = NotchConstants.expandedPanelSize.height - notchSize.height - 24
-        return expandedPanelHeight * 0.3 + notchSize.height
-    }
-
-    private var expandedPanelHeight: CGFloat {
-        let fullHeight = NotchConstants.expandedPanelSize.height - notchSize.height - 24
-        let collapsedHeight: CGFloat = 155
-        return isActivityCollapsed ? collapsedHeight : fullHeight
+    init(viewModel: NotchViewModel? = nil) {
+        let viewModel = viewModel ?? NotchViewModel()
+        _viewModel = State(initialValue: viewModel)
+        _expandedPanelViewModel = State(
+            initialValue: ExpandedPanelViewModel(sessionStore: viewModel.sessionStore)
+        )
     }
 
     var body: some View {
+        @Bindable var bindableViewModel = viewModel
+
         VStack(spacing: 0) {
-            notchLayout
+            notchLayout(
+                showingSettings: $bindableViewModel.showingPanelSettings,
+                isActivityCollapsed: $bindableViewModel.isActivityCollapsed
+            )
         }
-        .padding(.horizontal, isExpanded ? cornerRadiusInsets.opened.top : cornerRadiusInsets.closed.bottom)
-        .padding(.bottom, isExpanded ? 12 : 0)
+        .padding(.horizontal, viewModel.isExpanded ? cornerRadiusInsets.opened.top : cornerRadiusInsets.closed.bottom)
+        .padding(.bottom, viewModel.isExpanded ? 12 : 0)
         .background {
             ZStack(alignment: .top) {
                 Color.black
-                GrassIslandView(state: sessionStore.unifiedState)
-                    .frame(height: grassHeight, alignment: .bottom)
-                    .opacity(isExpanded && !showingPanelSettings ? 1 : 0)
+                GrassIslandView(state: viewModel.sessionStore.unifiedState)
+                    .frame(height: viewModel.grassHeight, alignment: .bottom)
+                    .opacity(viewModel.isExpanded && !viewModel.showingPanelSettings ? 1 : 0)
             }
         }
         .overlay(alignment: .topTrailing) {
-            if isExpanded && !showingPanelSettings {
-                Button(action: {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        isActivityCollapsed.toggle()
-                    }
-                }) {
-                    Image(systemName: isActivityCollapsed ? "chevron.down" : "chevron.up")
+            if viewModel.isExpanded && !viewModel.showingPanelSettings {
+                Button(action: viewModel.toggleActivityCollapse) {
+                    Image(systemName: viewModel.isActivityCollapsed ? "chevron.down" : "chevron.up")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                         .padding(8)
                 }
                 .buttonStyle(.plain)
-                .offset(y: grassHeight - 30)
+                .offset(y: viewModel.grassHeight - 30)
                 .padding(.trailing, 30)
             }
         }
-        .clipShape(NotchShape(
-            topCornerRadius: topCornerRadius,
-            bottomCornerRadius: bottomCornerRadius
-        ))
-        .shadow(
-            color: isExpanded ? .black.opacity(0.7) : .clear,
-            radius: 6
+        .clipShape(
+            NotchShape(
+                topCornerRadius: viewModel.topCornerRadius,
+                bottomCornerRadius: viewModel.bottomCornerRadius
+            )
         )
+        .shadow(color: viewModel.isExpanded ? .black.opacity(0.7) : .clear, radius: 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(panelAnimation, value: isExpanded)
+        .animation(viewModel.panelAnimation, value: viewModel.isExpanded)
         .onReceive(NotificationCenter.default.publisher(for: .periquitoShouldCollapse)) { _ in
-            panelManager.collapse()
+            viewModel.collapsePanel()
         }
-        .onChange(of: isExpanded) { _, expanded in
-            if !expanded {
-                showingPanelSettings = false
-            }
+        .onChange(of: viewModel.isExpanded) { _, expanded in
+            viewModel.handleExpansionChange(expanded)
         }
     }
 
     @ViewBuilder
-    private var notchLayout: some View {
+    private func notchLayout(
+        showingSettings: Binding<Bool>,
+        isActivityCollapsed: Binding<Bool>
+    ) -> some View {
         ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
                 headerRow
-                    .frame(height: notchSize.height)
+                    .frame(height: viewModel.notchSize.height)
 
-                if isExpanded {
+                if viewModel.isExpanded {
                     ExpandedPanelView(
-                        sessionStore: sessionStore,
-                        showingSettings: $showingPanelSettings,
-                        isActivityCollapsed: $isActivityCollapsed
+                        viewModel: expandedPanelViewModel,
+                        showingSettings: showingSettings,
+                        isActivityCollapsed: isActivityCollapsed
                     )
                     .frame(
                         width: NotchConstants.expandedPanelSize.width - 48,
-                        height: expandedPanelHeight
+                        height: viewModel.expandedPanelHeight
                     )
                     .transition(
                         .asymmetric(
@@ -139,24 +105,25 @@ struct NotchContentView: View {
                 }
             }
 
-            if isExpanded {
+            if viewModel.isExpanded {
                 HStack {
-                    if showingPanelSettings {
+                    if viewModel.showingPanelSettings {
                         backButton
                             .padding(.leading, 15)
                     } else {
                         HStack(spacing: 8) {
                             PanelHeaderButton(
-                                sfSymbol: panelManager.isPinned ? "pin.fill" : "pin",
-                                action: { panelManager.togglePin() }
+                                sfSymbol: viewModel.panelManager.isPinned ? "pin.fill" : "pin",
+                                action: viewModel.togglePin
                             )
                             PanelHeaderButton(
-                                sfSymbol: isMuted ? "bell.slash" : "bell",
-                                action: toggleMute
+                                sfSymbol: viewModel.isMuted ? "bell.slash" : "bell",
+                                action: viewModel.toggleMute
                             )
                         }
                         .padding(.leading, 12)
                     }
+
                     Spacer()
                     headerButtons
                 }
@@ -169,14 +136,14 @@ struct NotchContentView: View {
 
     private var headerButtons: some View {
         HStack(spacing: 8) {
-            PanelHeaderButton(sfSymbol: "gearshape", action: { showingPanelSettings = true })
-            PanelHeaderButton(sfSymbol: "xmark", action: { panelManager.collapse() })
+            PanelHeaderButton(sfSymbol: "gearshape", action: viewModel.showSettings)
+            PanelHeaderButton(sfSymbol: "xmark", action: viewModel.collapsePanel)
         }
         .padding(.trailing, 8)
     }
 
     private var backButton: some View {
-        Button(action: { showingPanelSettings = false }) {
+        Button(action: viewModel.hideSettings) {
             HStack(spacing: 5) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 11, weight: .semibold))
@@ -188,31 +155,20 @@ struct NotchContentView: View {
         .buttonStyle(.plain)
     }
 
-    @ViewBuilder
     private var headerRow: some View {
         HStack(spacing: 0) {
             Color.clear
-                .frame(width: notchSize.width - cornerRadiusInsets.closed.top)
+                .frame(width: viewModel.notchSize.width - cornerRadiusInsets.closed.top)
 
-            headerSprites
-                .offset(x: 15, y: -2)
-                .frame(width: sideWidth)
-                .opacity(isExpanded ? 0 : 1)
-                .animation(.none, value: isExpanded)
+            SessionSpriteView(
+                state: viewModel.sessionStore.unifiedState,
+                isSelected: true
+            )
+            .offset(x: 15, y: -2)
+            .frame(width: viewModel.sideWidth)
+            .opacity(viewModel.isExpanded ? 0 : 1)
+            .animation(.none, value: viewModel.isExpanded)
         }
-    }
-
-    @ViewBuilder
-    private var headerSprites: some View {
-        SessionSpriteView(
-            state: sessionStore.unifiedState,
-            isSelected: true
-        )
-    }
-
-    private func toggleMute() {
-        AppSettings.toggleMute()
-        isMuted = AppSettings.isMuted
     }
 }
 

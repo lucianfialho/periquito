@@ -12,21 +12,12 @@ final class SpacedRepetitionManager {
     var quizState: QuizState = .idle
     private(set) var currentQuiz: QuizItem?
     private(set) var currentOptions: [String] = []
+    private let historyRepository: any HistoryRepository
 
-    private static let reviewsFile: URL = {
-        let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".english-learning")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("reviews.json")
-    }()
+    private static let reviewsFile = AppPaths.reviewsFile
 
-    private static var historyFile: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".english-learning")
-            .appendingPathComponent("history.jsonl")
-    }
-
-    private init() {
+    init(historyRepository: (any HistoryRepository)? = nil) {
+        self.historyRepository = historyRepository ?? FileHistoryRepository.shared
         loadReviews()
     }
 
@@ -34,7 +25,7 @@ final class SpacedRepetitionManager {
 
     /// Scans history.jsonl for corrections not yet in review queue
     func syncFromHistory() async {
-        let corrections = await DistractorEngine.loadFromHistory()
+        let corrections = await DistractorEngine.loadFromHistory(repository: historyRepository)
 
         for correction in corrections {
             let dedupKey = correction.wrong.lowercased().trimmingCharacters(in: .whitespaces)
@@ -117,7 +108,10 @@ final class SpacedRepetitionManager {
         // Award XP for reviews
         Task {
             let stats = await HistoryStatsLoader.load()
-            LevelManager.shared.awardXP(for: isCorrect ? "good" : "correction", rollingAccuracy: stats.rollingAccuracy ?? 0)
+            LevelManager.shared.awardXP(
+                for: isCorrect ? .good : .correction,
+                rollingAccuracy: stats.rollingAccuracy ?? 0
+            )
         }
 
         logger.info("Quiz answer: \(isCorrect ? "correct" : "incorrect") for '\(quiz.incorrectSentence)'")

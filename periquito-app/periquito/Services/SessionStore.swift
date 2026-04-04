@@ -11,7 +11,7 @@ final class SessionStore {
     private(set) var sessions: [String: SessionData] = [:]
     private var nextSessionNumberByProject: [String: Int] = [:]
 
-    private init() {}
+    init() {}
 
     var sortedSessions: [SessionData] {
         sessions.values.sorted { lhs, rhs in
@@ -59,7 +59,7 @@ final class SessionStore {
     func process(_ event: HookEvent) -> SessionData {
         let isInteractive = event.interactive ?? true
         let session = getOrCreateSession(sessionId: event.sessionId, cwd: event.cwd, isInteractive: isInteractive)
-        let isProcessing = event.status != "waiting_for_input"
+        let isProcessing = event.status.isProcessing
         session.updateProcessingState(isProcessing: isProcessing)
 
         if let mode = event.permissionMode {
@@ -67,7 +67,7 @@ final class SessionStore {
         }
 
         switch event.event {
-        case "UserPromptSubmit":
+        case .userPromptSubmit:
             if let prompt = event.userPrompt {
                 session.recordUserPrompt(prompt)
             }
@@ -79,15 +79,15 @@ final class SessionStore {
                 session.updateTask(.working)
             }
 
-        case "PreCompact":
+        case .preCompact:
             session.updateTask(.compacting)
 
-        case "SessionStart":
+        case .sessionStart:
             if isProcessing {
                 session.updateTask(.working)
             }
 
-        case "PreToolUse":
+        case .preToolUse:
             let toolInput = event.toolInput?.mapValues { $0.value }
             session.recordPreToolUse(tool: event.tool, toolInput: toolInput, toolUseId: event.toolUseId)
             if event.tool == "AskUserQuestion" {
@@ -98,26 +98,26 @@ final class SessionStore {
                 session.updateTask(.working)
             }
 
-        case "PermissionRequest":
+        case .permissionRequest:
             let question = Self.buildPermissionQuestion(tool: event.tool, toolInput: event.toolInput)
             session.updateTask(.waiting)
             session.setPendingQuestions([question])
 
-        case "PostToolUse":
-            let success = event.status != "error"
+        case .postToolUse:
+            let success = !event.status.isError
             session.recordPostToolUse(tool: event.tool, toolUseId: event.toolUseId, success: success)
             session.clearPendingQuestions()
             session.updateTask(.working)
 
-        case "Stop", "SubagentStop":
+        case .stop, .subagentStop:
             session.clearPendingQuestions()
             session.updateTask(.idle)
 
-        case "SessionEnd":
+        case .sessionEnd:
             session.endSession()
             removeSession(event.sessionId)
 
-        default:
+        case .other:
             if !isProcessing && session.task != .idle {
                 session.updateTask(.idle)
             }

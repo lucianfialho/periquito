@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 
 enum ScreenSelectionMode: String, Codable {
     case automatic
@@ -28,19 +27,22 @@ struct ScreenIdentifier: Codable, Equatable, Hashable {
 }
 
 @MainActor
-final class ScreenSelector: ObservableObject {
+@Observable
+final class ScreenSelector {
     static let shared = ScreenSelector()
 
-    @Published private(set) var availableScreens: [NSScreen] = []
-    @Published private(set) var selectedScreen: NSScreen?
-    @Published var selectionMode: ScreenSelectionMode = .automatic
-    @Published var isPickerExpanded: Bool = false
+    private(set) var availableScreens: [NSScreen] = []
+    private(set) var selectedScreen: NSScreen?
+    var selectionMode: ScreenSelectionMode = .automatic
+    var isPickerExpanded = false
 
     private let modeKey = "screenSelectionMode"
     private let screenIdentifierKey = "selectedScreenIdentifier"
+    private let settingsStore: SettingsStoring
     private var savedIdentifier: ScreenIdentifier?
 
-    private init() {
+    init(settingsStore: (any SettingsStoring)? = nil) {
+        self.settingsStore = settingsStore ?? UserDefaultsSettingsStore()
         loadPreferences()
         refreshScreens()
     }
@@ -84,25 +86,25 @@ final class ScreenSelector: ObservableObject {
     }
 
     private func loadPreferences() {
-        if let modeString = UserDefaults.standard.string(forKey: modeKey),
+        if let modeString = settingsStore.string(forKey: modeKey),
            let mode = ScreenSelectionMode(rawValue: modeString) {
             selectionMode = mode
         }
 
-        if let data = UserDefaults.standard.data(forKey: screenIdentifierKey),
+        if let data = settingsStore.data(forKey: screenIdentifierKey),
            let identifier = try? JSONDecoder().decode(ScreenIdentifier.self, from: data) {
             savedIdentifier = identifier
         }
     }
 
     private func savePreferences() {
-        UserDefaults.standard.set(selectionMode.rawValue, forKey: modeKey)
+        settingsStore.set(selectionMode.rawValue, forKey: modeKey)
 
         if let identifier = savedIdentifier,
            let data = try? JSONEncoder().encode(identifier) {
-            UserDefaults.standard.set(data, forKey: screenIdentifierKey)
+            settingsStore.set(data, forKey: screenIdentifierKey)
         } else {
-            UserDefaults.standard.removeObject(forKey: screenIdentifierKey)
+            settingsStore.removeObject(forKey: screenIdentifierKey)
         }
     }
 }

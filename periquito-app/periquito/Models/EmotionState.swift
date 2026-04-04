@@ -30,10 +30,8 @@ final class EmotionState {
 
     init() {}
 
-    func recordEmotion(_ rawEmotion: String, intensity: Double, prompt: String) {
-        let emotion = PeriquitoEmotion(rawValue: rawEmotion)
-
-        if let emotion, emotion != .neutral {
+    func recordEmotion(_ emotion: PeriquitoEmotion, intensity: Double, prompt: String) {
+        if emotion != .neutral {
             let dampened = intensity * Self.intensityDampen
             scores[emotion, default: 0.0] = min(scores[emotion, default: 0.0] + dampened, 1.0)
             for key in scores.keys where key != emotion {
@@ -49,7 +47,7 @@ final class EmotionState {
         updateCurrentEmotion()
 
         let truncatedPrompt = String(prompt.prefix(60))
-        logger.info("[Emotion] \"\(truncatedPrompt, privacy: .public)\" → detected: \(rawEmotion, privacy: .public) (\(String(format: "%.2f", intensity), privacy: .public)) → cumulative: {\(self.scoresDescription, privacy: .public)}")
+        logger.info("[Emotion] \"\(truncatedPrompt, privacy: .public)\" → detected: \(emotion.rawValue, privacy: .public) (\(String(format: "%.2f", intensity), privacy: .public)) → cumulative: {\(self.scoresDescription, privacy: .public)}")
     }
 
     func decayAll() {

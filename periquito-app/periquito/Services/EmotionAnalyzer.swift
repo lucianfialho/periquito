@@ -3,10 +3,10 @@ import os.log
 
 private let logger = Logger(subsystem: "com.lucianfialho.periquito", category: "EnglishAnalyzer")
 
-private struct EnglishAnalysisResult: Decodable, Sendable {
-    let type: String          // "correction", "good", "skip"
-    let tip: String?          // correction tip text
-    let category: String?     // "grammar", "spelling", "word_choice", "phrasing", "punctuation"
+nonisolated private struct EnglishAnalysisResult: Decodable, Sendable {
+    let type: EnglishEvaluationType
+    let tip: String?
+    let category: String?
 }
 
 @MainActor
@@ -15,65 +15,58 @@ final class EmotionAnalyzer {
 
     private static let language = "English"
 
-    private static let historyDir: URL = {
-        let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".english-learning")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }()
+    private let historyRepository: any HistoryRepository
+    private let claudeLocator: any ClaudeExecutableLocating
 
-    private static var historyFile: URL {
-        historyDir.appendingPathComponent("history.jsonl")
+    init(
+        historyRepository: (any HistoryRepository)? = nil,
+        claudeLocator: (any ClaudeExecutableLocating)? = nil
+    ) {
+        self.historyRepository = historyRepository ?? FileHistoryRepository.shared
+        self.claudeLocator = claudeLocator ?? ClaudeExecutableLocator()
     }
 
-    private init() {}
-
     struct AnalysisResult {
-        let emotion: String
+        let emotion: PeriquitoEmotion
         let intensity: Double
-        let type: String       // "good", "correction", "skip"
+        let type: EnglishEvaluationType
         let tip: String?
         let category: String?
     }
 
     func analyze(_ prompt: String) async -> AnalysisResult {
         let start = ContinuousClock.now
-
-        // Skip very short prompts (likely not real English)
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+
         guard trimmed.count >= 5 else {
             logger.info("Prompt too short, skipping analysis")
-            return AnalysisResult(emotion: "neutral", intensity: 0.0, type: "skip", tip: nil, category: nil)
+            return AnalysisResult(emotion: .neutral, intensity: 0.0, type: .skip, tip: nil, category: nil)
         }
 
         do {
             let result = try await analyzeWithClaude(prompt: trimmed)
             let elapsed = ContinuousClock.now - start
-            logger.info("English analysis took \(elapsed, privacy: .public): type=\(result.type, privacy: .public)")
+            logger.info("English analysis took \(elapsed, privacy: .public): type=\(result.type.rawValue, privacy: .public)")
 
-            // Log to history
-            logToHistory(result: result, prompt: trimmed)
+            await logToHistory(result: result, prompt: trimmed)
 
-            // Map result to emotion
             switch result.type {
-            case "good":
-                return AnalysisResult(emotion: "happy", intensity: 0.7, type: "good", tip: result.tip, category: result.category)
-            case "correction":
-                return AnalysisResult(emotion: "sad", intensity: 0.6, type: "correction", tip: result.tip, category: result.category)
-            default:
-                return AnalysisResult(emotion: "neutral", intensity: 0.0, type: "skip", tip: nil, category: nil)
+            case .good:
+                return AnalysisResult(emotion: .happy, intensity: 0.7, type: .good, tip: result.tip, category: result.category)
+            case .correction:
+                return AnalysisResult(emotion: .sad, intensity: 0.6, type: .correction, tip: result.tip, category: result.category)
+            case .skip, .other:
+                return AnalysisResult(emotion: .neutral, intensity: 0.0, type: .skip, tip: nil, category: nil)
             }
         } catch {
             let elapsed = ContinuousClock.now - start
             logger.error("English analysis failed (\(elapsed, privacy: .public)): \(error.localizedDescription)")
-            return AnalysisResult(emotion: "neutral", intensity: 0.0, type: "skip", tip: nil, category: nil)
+            return AnalysisResult(emotion: .neutral, intensity: 0.0, type: .skip, tip: nil, category: nil)
         }
     }
 
     private func analyzeWithClaude(prompt: String) async throws -> EnglishAnalysisResult {
-        // Find claude binary
-        let claudePath = Self.findClaude()
-        guard let claudePath else {
+        guard let claudePath = claudeLocator.locateClaudeExecutable() else {
             logger.error("Claude CLI not found in PATH")
             throw NSError(domain: "EnglishAnalyzer", code: 1, userInfo: [NSLocalizedDescriptionKey: "Claude CLI not found"])
         }
@@ -99,58 +92,32 @@ final class EmotionAnalyzer {
             "-p", analysisPrompt,
             "--output-format", "stream-json",
             "--verbose",
-            "--max-turns", "1"
+            "--max-turns", "1",
         ]
 
-        // Set environment to avoid recursive hooks
-        var env = ProcessInfo.processInfo.environment
-        env["PERIQUITO_ANALYSIS_RUNNING"] = "1"
-        process.environment = env
+        var environment = ProcessInfo.processInfo.environment
+        environment["PERIQUITO_ANALYSIS_RUNNING"] = "1"
+        process.environment = environment
 
         let stdout = Pipe()
-        let stderr = Pipe()
         process.standardOutput = stdout
-        process.standardError = stderr
+        process.standardError = Pipe()
         process.standardInput = FileHandle.nullDevice
 
         return try await withCheckedThrowingContinuation { continuation in
             process.terminationHandler = { _ in
                 let data = stdout.fileHandleForReading.readDataToEndOfFile()
                 let rawOutput = String(data: data, encoding: .utf8) ?? ""
-
-                // Parse stream-json: extract text from assistant events
-                var textParts: [String] = []
-                for line in rawOutput.components(separatedBy: "\n") {
-                    let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty,
-                          let lineData = trimmed.data(using: .utf8),
-                          let obj = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                          obj["type"] as? String == "assistant",
-                          let message = obj["message"] as? [String: Any],
-                          let content = message["content"] as? [[String: Any]] else { continue }
-                    for block in content {
-                        if block["type"] as? String == "text", let text = block["text"] as? String {
-                            textParts.append(text)
-                        }
-                    }
-                }
-                let output = textParts.joined().trimmingCharacters(in: .whitespacesAndNewlines)
-
-                let jsonString = EmotionAnalyzer.extractJSON(from: output)
+                let output = Self.extractAssistantText(from: rawOutput)
+                let jsonString = Self.extractJSON(from: output)
 
                 if let jsonData = jsonString.data(using: .utf8),
                    let result = try? JSONDecoder().decode(EnglishAnalysisResult.self, from: jsonData) {
                     continuation.resume(returning: result)
-                } else {
-                    // Fallback: try to detect type from text
-                    if output.contains("\"type\":\"good\"") || output.contains("Good") {
-                        continuation.resume(returning: EnglishAnalysisResult(type: "good", tip: nil, category: nil))
-                    } else if output.contains("❌") || output.contains("→") || output.contains("correction") {
-                        continuation.resume(returning: EnglishAnalysisResult(type: "correction", tip: String(output.prefix(200)), category: "other"))
-                    } else {
-                        continuation.resume(returning: EnglishAnalysisResult(type: "skip", tip: nil, category: nil))
-                    }
+                    return
                 }
+
+                continuation.resume(returning: Self.fallbackResult(from: output))
             }
 
             do {
@@ -161,42 +128,49 @@ final class EmotionAnalyzer {
         }
     }
 
-    private static func findClaude() -> String? {
-        // Check common locations
-        let candidates = [
-            "/usr/local/bin/claude",
-            "/opt/homebrew/bin/claude",
-            "\(FileManager.default.homeDirectoryForCurrentUser.path)/.local/bin/claude",
-            "\(FileManager.default.homeDirectoryForCurrentUser.path)/.claude/local/claude"
-        ]
+    nonisolated private static func extractAssistantText(from rawOutput: String) -> String {
+        var textParts: [String] = []
 
-        for path in candidates {
-            if FileManager.default.isExecutableFile(atPath: path) {
-                return path
+        for line in rawOutput.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty,
+                  let lineData = trimmed.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                  object["type"] as? String == "assistant",
+                  let message = object["message"] as? [String: Any],
+                  let content = message["content"] as? [[String: Any]] else {
+                continue
+            }
+
+            for block in content where block["type"] as? String == "text" {
+                if let text = block["text"] as? String {
+                    textParts.append(text)
+                }
             }
         }
 
-        // Try which
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = ["claude"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        try? process.run()
-        process.waitUntilExit()
-        let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if let result, !result.isEmpty, FileManager.default.isExecutableFile(atPath: result) {
-            return result
+        return textParts.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    nonisolated private static func fallbackResult(from output: String) -> EnglishAnalysisResult {
+        if output.contains("\"type\":\"good\"") || output.contains("Good") {
+            return EnglishAnalysisResult(type: .good, tip: nil, category: nil)
         }
 
-        return nil
+        if output.contains("❌") || output.contains("→") || output.contains("correction") {
+            return EnglishAnalysisResult(
+                type: .correction,
+                tip: String(output.prefix(200)),
+                category: "other"
+            )
+        }
+
+        return EnglishAnalysisResult(type: .skip, tip: nil, category: nil)
     }
 
     nonisolated static func extractJSON(from text: String) -> String {
         var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Strip markdown code blocks
         if cleaned.hasPrefix("```") {
             if let firstNewline = cleaned.firstIndex(of: "\n") {
                 cleaned = String(cleaned[cleaned.index(after: firstNewline)...])
@@ -207,7 +181,6 @@ final class EmotionAnalyzer {
             cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        // Find first { to last }
         if let start = cleaned.firstIndex(of: "{"),
            let end = cleaned.lastIndex(of: "}") {
             cleaned = String(cleaned[start...end])
@@ -216,32 +189,20 @@ final class EmotionAnalyzer {
         return cleaned
     }
 
-    private func logToHistory(result: EnglishAnalysisResult, prompt: String) {
-        let today = ISO8601DateFormatter().string(from: Date())
-        var entry: [String: Any] = [
-            "type": result.type,
-            "date": today,
-            "prompt": String(prompt.prefix(200))
-        ]
-        if let tip = result.tip {
-            entry["tip"] = tip
-        }
-        if let category = result.category {
-            entry["category"] = category
-        }
+    private func logToHistory(result: EnglishAnalysisResult, prompt: String) async {
+        let entry = HistoryEntry(
+            type: result.type,
+            date: ISO8601DateFormatter().string(from: .now),
+            prompt: String(prompt.prefix(200)),
+            tip: result.tip,
+            category: result.category
+        )
 
-        guard let data = try? JSONSerialization.data(withJSONObject: entry),
-              let line = String(data: data, encoding: .utf8) else { return }
-
-        let fileURL = Self.historyFile
-        if let handle = try? FileHandle(forWritingTo: fileURL) {
-            handle.seekToEndOfFile()
-            handle.write(Data((line + "\n").utf8))
-            handle.closeFile()
-        } else {
-            try? (line + "\n").write(to: fileURL, atomically: true, encoding: .utf8)
+        do {
+            try await historyRepository.append(entry)
+            logger.info("Logged \(result.type.rawValue, privacy: .public) to history")
+        } catch {
+            logger.error("Failed to log history: \(error.localizedDescription)")
         }
-
-        logger.info("Logged \(result.type, privacy: .public) to history")
     }
 }

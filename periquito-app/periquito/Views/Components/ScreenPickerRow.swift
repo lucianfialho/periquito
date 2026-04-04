@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ScreenPickerRow: View {
-    @ObservedObject var screenSelector: ScreenSelector
+    @Bindable var screenSelector: ScreenSelector
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

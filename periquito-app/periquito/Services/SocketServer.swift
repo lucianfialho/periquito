@@ -129,20 +129,20 @@ final class SocketServer {
 
     private func logEvent(_ event: HookEvent) {
         switch event.event {
-        case "SessionStart":
+        case .sessionStart:
             logger.info("Session started")
-        case "SessionEnd":
+        case .sessionEnd:
             logger.info("Session ended")
-        case "PreToolUse":
+        case .preToolUse:
             let tool = event.tool ?? "unknown"
             logger.info("Tool: \(tool, privacy: .public)")
-        case "PostToolUse":
+        case .postToolUse:
             let tool = event.tool ?? "unknown"
-            let success = event.status != "error"
+            let success = !event.status.isError
             logger.info("Result: \(success ? "✓" : "✗", privacy: .public) \(tool, privacy: .public)")
-        case "Stop", "SubagentStop":
+        case .stop, .subagentStop:
             logger.info("Done")
-        default:
+        case .userPromptSubmit, .permissionRequest, .preCompact, .other:
             break
         }
     }

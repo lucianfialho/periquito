@@ -3,7 +3,7 @@ import os.log
 
 private let logger = Logger(subsystem: "com.lucianfialho.periquito", category: "HistoryStats")
 
-struct HistoryStats: Sendable {
+nonisolated struct HistoryStats: Equatable, Sendable {
     let totalGood: Int
     let totalCorrections: Int
     let rollingAccuracy: Int?
@@ -19,62 +19,61 @@ struct HistoryStats: Sendable {
     static let empty = HistoryStats(totalGood: 0, totalCorrections: 0, rollingAccuracy: nil)
 }
 
-enum HistoryStatsLoader {
-    private static var historyFile: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".english-learning")
-            .appendingPathComponent("history.jsonl")
+struct HistoryStatsLoader {
+    private let repository: any HistoryRepository
+
+    init(repository: any HistoryRepository) {
+        self.repository = repository
     }
 
-    static func load() async -> HistoryStats {
-        let fileURL = historyFile
-        return await Task.detached {
-            guard FileManager.default.fileExists(atPath: fileURL.path) else {
-                logger.info("No history file found")
-                return HistoryStats.empty
+    func load() async -> HistoryStats {
+        guard let entries = try? await repository.loadEntries() else {
+            logger.error("Failed to read history file")
+            return .empty
+        }
+
+        if entries.isEmpty {
+            logger.info("No history file found")
+            return .empty
+        }
+
+        var good = 0
+        var corrections = 0
+        var evaluatedTypes: [EnglishEvaluationType] = []
+
+        for entry in entries {
+            switch entry.type {
+            case .good:
+                good += 1
+                evaluatedTypes.append(entry.type)
+            case .correction:
+                corrections += 1
+                evaluatedTypes.append(entry.type)
+            case .skip, .other:
+                break
             }
+        }
 
-            guard let data = try? String(contentsOf: fileURL, encoding: .utf8) else {
-                logger.error("Failed to read history file")
-                return HistoryStats.empty
-            }
+        let rolling: Int?
+        let recent = evaluatedTypes.suffix(50)
+        if recent.isEmpty {
+            rolling = nil
+        } else {
+            let recentGood = recent.filter { $0 == .good }.count
+            rolling = recentGood * 100 / recent.count
+        }
 
-            var good = 0
-            var corrections = 0
-            var evaluatedTypes: [String] = []
+        logger.info("Loaded stats: \(good) good, \(corrections) corrections, rolling: \(rolling ?? -1)%")
+        return HistoryStats(totalGood: good, totalCorrections: corrections, rollingAccuracy: rolling)
+    }
 
-            for line in data.split(separator: "\n") {
-                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty,
-                      let lineData = trimmed.data(using: .utf8),
-                      let obj = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                      let type = obj["type"] as? String else {
-                    continue
-                }
+    static func load(repository: (any HistoryRepository)? = nil) async -> HistoryStats {
+        let repository = if let repository {
+            repository
+        } else {
+            await MainActor.run { FileHistoryRepository.shared }
+        }
 
-                switch type {
-                case "good":
-                    good += 1
-                    evaluatedTypes.append(type)
-                case "correction":
-                    corrections += 1
-                    evaluatedTypes.append(type)
-                default: break
-                }
-            }
-
-            // Rolling accuracy: last 50 evaluated entries
-            let rolling: Int?
-            let recent = evaluatedTypes.suffix(50)
-            if recent.isEmpty {
-                rolling = nil
-            } else {
-                let recentGood = recent.filter { $0 == "good" }.count
-                rolling = recentGood * 100 / recent.count
-            }
-
-            logger.info("Loaded stats: \(good) good, \(corrections) corrections, rolling: \(rolling ?? -1)%")
-            return HistoryStats(totalGood: good, totalCorrections: corrections, rollingAccuracy: rolling)
-        }.value
+        return await HistoryStatsLoader(repository: repository).load()
     }
 }
